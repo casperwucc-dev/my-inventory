@@ -20,6 +20,7 @@ const Modal = ({ isOpen, onClose, title, children }) => {
     }}>
       <div className="card" style={{
         width: '100%',
+        maxWidth: '550px',
         maxHeight: '100%',
         overflowY: 'auto',
         position: 'relative',
