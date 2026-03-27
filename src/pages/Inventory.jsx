@@ -112,7 +112,9 @@ const Inventory = () => {
                       <td style={{ fontWeight: 500 }}>{p.name}</td>
                       <td>{p.category}</td>
                       <td>{p.price.toLocaleString()}</td>
-                      <td>{p.stock}</td>
+                      <td style={{ fontWeight: 'bold', color: (p.stock || 0) <= (p.min_stock_alert || 5) ? 'var(--danger)' : 'inherit' }}>
+                        {p.stock} <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 'normal' }}>{p.base_unit || '包'}</span>
+                      </td>
                       <td>
                         {p.stock <= p.minStockAlert ? (
                           <span className="badge badge-danger">存貨不足</span>
@@ -201,6 +203,20 @@ const Inventory = () => {
               onChange={(e) => setFormData({ ...formData, minStockAlert: Number(e.target.value) })}
               style={{ padding: '0.625rem', border: '1px solid var(--border)', borderRadius: '0.375rem', backgroundColor: 'transparent', color: 'inherit' }}
             />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            <div className="flex flex-col gap-2">
+              <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>進貨單位 (如: 箱)</label>
+              <input required type="text" value={formData.purchase_unit || '箱'} onChange={(e) => setFormData({ ...formData, purchase_unit: e.target.value })} style={{ padding: '0.625rem', border: '1px solid var(--border)', borderRadius: '0.375rem', backgroundColor: 'transparent', color: 'inherit' }} />
+            </div>
+            <div className="flex flex-col gap-2">
+              <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>庫存單位 (如: 包)</label>
+              <input required type="text" value={formData.base_unit || '包'} onChange={(e) => setFormData({ ...formData, base_unit: e.target.value })} style={{ padding: '0.625rem', border: '1px solid var(--border)', borderRadius: '0.375rem', backgroundColor: 'transparent', color: 'inherit' }} />
+            </div>
+          </div>
+          <div className="flex flex-col gap-2">
+            <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>換算率 (1 {formData.purchase_unit || '箱'} = ? {formData.base_unit || '包'})</label>
+            <input required type="number" min="1" value={formData.conversion_rate || 1} onChange={(e) => setFormData({ ...formData, conversion_rate: Number(e.target.value) })} style={{ padding: '0.625rem', border: '1px solid var(--border)', borderRadius: '0.375rem', backgroundColor: 'transparent', color: 'inherit' }} />
           </div>
           <div style={{ marginTop: '0.5rem', display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
             <button type="button" className="btn btn-ghost" onClick={handleCloseModal}>取消</button>

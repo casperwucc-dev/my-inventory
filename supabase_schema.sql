@@ -8,6 +8,9 @@ CREATE TABLE IF NOT EXISTS products (
   price NUMERIC NOT NULL DEFAULT 0,
   stock INTEGER NOT NULL DEFAULT 0,
   min_stock_alert INTEGER NOT NULL DEFAULT 5,
+  conversion_rate INTEGER DEFAULT 1,
+  base_unit TEXT DEFAULT '包',
+  purchase_unit TEXT DEFAULT '箱',
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 

@@ -142,7 +142,9 @@ const Sales = () => {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
             <div className="flex flex-col gap-2">
-              <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>銷售數量</label>
+              <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>
+                銷售數量 ({products.find(p => p.id === formData.productId)?.base_unit || '包'})
+              </label>
               <input
                 required
                 type="number"

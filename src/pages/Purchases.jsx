@@ -121,7 +121,9 @@ const Purchases = () => {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
             <div className="flex flex-col gap-2">
-              <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>進貨數量</label>
+              <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>
+                進貨數量 ({products.find(p => p.id === formData.productId)?.purchase_unit || '箱'})
+              </label>
               <input
                 required
                 type="number"

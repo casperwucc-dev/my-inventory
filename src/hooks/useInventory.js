@@ -69,7 +69,10 @@ export const useInventory = () => {
         category: product.category,
         price: product.price,
         stock: product.stock,
-        min_stock_alert: product.minStockAlert
+        min_stock_alert: product.minStockAlert,
+        conversion_rate: product.conversion_rate || 1,
+        base_unit: product.base_unit || '包',
+        purchase_unit: product.purchase_unit || '箱'
       }])
       .select();
     handleError(error, 'Error adding product');
@@ -85,7 +88,10 @@ export const useInventory = () => {
         category: updatedProduct.category,
         price: updatedProduct.price,
         stock: updatedProduct.stock,
-        min_stock_alert: updatedProduct.minStockAlert
+        min_stock_alert: updatedProduct.minStockAlert,
+        conversion_rate: updatedProduct.conversion_rate || 1,
+        base_unit: updatedProduct.base_unit || '包',
+        purchase_unit: updatedProduct.purchase_unit || '箱'
       })
       .eq('id', id);
     handleError(error, 'Error updating product');
@@ -115,9 +121,11 @@ export const useInventory = () => {
 
     // Update stock
     const product = products.find(p => p.id === purchase.productId);
+    const addedQty = purchase.quantity * (product?.conversion_rate || 1);
+    
     const { error: stockError } = await supabase
       .from('products')
-      .update({ stock: product.stock + purchase.quantity })
+      .update({ stock: (product?.stock || 0) + addedQty })
       .eq('id', purchase.productId);
     handleError(stockError, 'Error updating product stock');
 
