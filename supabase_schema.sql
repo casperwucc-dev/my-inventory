@@ -95,3 +95,34 @@ INSERT INTO customers (name, contact, phone, address)
 VALUES 
   ('個人客戶-張三', '張三', '0912345678', '新北市板橋區')
 ON CONFLICT DO NOTHING;
+
+-- 7. Profiles Table
+CREATE TABLE IF NOT EXISTS profiles (
+  id UUID REFERENCES auth.users ON DELETE CASCADE PRIMARY KEY,
+  email TEXT NOT NULL,
+  full_name TEXT,
+  role TEXT DEFAULT 'staff',
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+ALTER TABLE profiles DISABLE ROW LEVEL SECURITY;
+
+-- Handle new user signup trigger
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS trigger AS $$
+BEGIN
+  INSERT INTO public.profiles (id, email, full_name, role)
+  VALUES (new.id, new.email, (new.raw_user_meta_data->>'full_name'), 'staff');
+  RETURN new;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- Seed existing users into profiles
+INSERT INTO public.profiles (id, email, role)
+SELECT id, email, 'admin' FROM auth.users
+ON CONFLICT (id) DO NOTHING;

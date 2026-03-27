@@ -24,6 +24,7 @@ const Sidebar = () => {
     { name: '零用金管理', icon: <Banknote size={20} />, path: '/petty-cash' },
     { name: '廠商管理', icon: <Settings size={20} />, path: '/suppliers' },
     { name: '客戶管理', icon: <User size={20} />, path: '/customers' },
+    { name: '使用者管理', icon: <User size={20} />, path: '/users' },
   ];
 
   return (
