@@ -3,6 +3,7 @@ import { useUsers } from '../hooks/useUsers';
 import { User, Mail, Shield, Calendar, Edit2, Loader2, Search, Plus, Lock } from 'lucide-react';
 import Modal from '../components/Common/Modal';
 import { createClient } from '@supabase/supabase-js';
+import { supabase } from '../utils/supabase';
 
 // Secondary client for adding users without logging out the current admin
 const signupClient = createClient(
@@ -81,7 +82,7 @@ const Users = () => {
 
         // 2. If a new password was provided, call the Edge Function
         if (formData.password) {
-          const { data, error: functionError } = await signupClient.functions.invoke('admin-manage-user', {
+          const { data, error: functionError } = await supabase.functions.invoke('admin-manage-user', {
             body: { userId: editingUser.id, newPassword: formData.password }
           });
           
