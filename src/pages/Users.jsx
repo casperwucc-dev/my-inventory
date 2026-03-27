@@ -1,19 +1,33 @@
 import React, { useState } from 'react';
 import { useUsers } from '../hooks/useUsers';
-import { User, Mail, Shield, Calendar, Edit2, Loader2, Search } from 'lucide-react';
+import { User, Mail, Shield, Calendar, Edit2, Loader2, Search, Plus, Lock } from 'lucide-react';
 import Modal from '../components/Common/Modal';
+import { createClient } from '@supabase/supabase-js';
+
+// Secondary client for adding users without logging out the current admin
+const signupClient = createClient(
+  import.meta.env.VITE_SUPABASE_URL,
+  import.meta.env.VITE_SUPABASE_ANON_KEY,
+  { auth: { persistSession: false } }
+);
 
 const Users = () => {
-  const { users, loading, updateProfile } = useUsers();
+  const { users, loading, updateProfile, fetchUsers } = useUsers();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isAddMode, setIsAddMode] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [formData, setFormData] = useState({
+    email: '',
+    password: '',
     full_name: '',
     role: 'staff'
   });
 
+  const [actionLoading, setActionLoading] = useState(false);
+
   const handleEdit = (user) => {
+    setIsAddMode(false);
     setEditingUser(user);
     setFormData({
       full_name: user.full_name || '',
@@ -22,10 +36,56 @@ const Users = () => {
     setIsModalOpen(true);
   };
 
+  const handleAdd = () => {
+    setIsAddMode(true);
+    setEditingUser(null);
+    setFormData({
+      email: '',
+      password: '',
+      full_name: '',
+      role: 'staff'
+    });
+    setIsModalOpen(true);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    await updateProfile(editingUser.id, formData);
-    setIsModalOpen(false);
+    setActionLoading(true);
+    try {
+      if (isAddMode) {
+        // Create auth user
+        const { data: signUpData, error: signUpError } = await signupClient.auth.signUp({
+          email: formData.email,
+          password: formData.password,
+          options: {
+            data: { 
+              full_name: formData.full_name,
+              role: formData.role 
+            }
+          }
+        });
+        
+        if (signUpError) throw signUpError;
+
+        // If a specific role was chosen (other than default staff), update it
+        if (formData.role !== 'staff' && signUpData.user) {
+          await updateProfile(signUpData.user.id, { role: formData.role });
+        }
+
+        alert('使用者帳號建立成功！\n若您有開啟 Email 驗證，請通知使用者查看信箱。');
+        await fetchUsers();
+      } else {
+        await updateProfile(editingUser.id, {
+          full_name: formData.full_name,
+          role: formData.role
+        });
+      }
+      setIsModalOpen(false);
+    } catch (err) {
+      alert('操作失敗：' + err.message);
+    } finally {
+      setActionLoading(false);
+    }
   };
 
   const filteredUsers = users.filter(u => 
@@ -40,6 +100,10 @@ const Users = () => {
           <h1 style={{ fontSize: '1.875rem', fontWeight: 'bold' }}>使用者管理</h1>
           <p style={{ color: 'var(--text-muted)' }}>管理系統存取人員及其權限設定。</p>
         </div>
+        <button className="btn btn-primary" onClick={handleAdd}>
+          <Plus size={20} />
+          新增人員
+        </button>
       </header>
 
       {loading && users.length === 0 ? (
@@ -103,10 +167,43 @@ const Users = () => {
         </>
       )}
 
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="編輯使用者資料">
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={isAddMode ? '新增人員帳號' : '編輯使用者資料'}>
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          {isAddMode && (
+            <>
+              <div className="flex flex-col gap-2">
+                <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>電子郵件 (登入帳號)</label>
+                <div style={{ position: 'relative' }}>
+                  <Mail size={16} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                  <input 
+                    required 
+                    type="email" 
+                    value={formData.email} 
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })} 
+                    placeholder="example@gmail.com"
+                    style={{ width: '100%', padding: '0.625rem 0.75rem 0.625rem 2.25rem', border: '1px solid var(--border)', borderRadius: '0.375rem', backgroundColor: 'transparent', color: 'inherit' }} 
+                  />
+                </div>
+              </div>
+              <div className="flex flex-col gap-2">
+                <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>設定初始密碼</label>
+                <div style={{ position: 'relative' }}>
+                  <Lock size={16} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                  <input 
+                    required 
+                    type="password" 
+                    minLength="6"
+                    value={formData.password} 
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })} 
+                    placeholder="至少 6 位字元"
+                    style={{ width: '100%', padding: '0.625rem 0.75rem 0.625rem 2.25rem', border: '1px solid var(--border)', borderRadius: '0.375rem', backgroundColor: 'transparent', color: 'inherit' }} 
+                  />
+                </div>
+              </div>
+            </>
+          )}
           <div className="flex flex-col gap-2">
-            <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>真實姓名</label>
+            <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>人員真實姓名</label>
             <input 
               required 
               type="text" 
@@ -129,7 +226,9 @@ const Users = () => {
           </div>
           <div style={{ marginTop: '0.5rem', display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
             <button type="button" className="btn btn-ghost" onClick={() => setIsModalOpen(false)}>取消</button>
-            <button type="submit" className="btn btn-primary" disabled={loading}>儲存變更</button>
+            <button type="submit" className="btn btn-primary" disabled={actionLoading}>
+              {actionLoading ? <Loader2 className="animate-spin" size={18} /> : (isAddMode ? '立即建立' : '儲存變更')}
+            </button>
           </div>
         </form>
       </Modal>
