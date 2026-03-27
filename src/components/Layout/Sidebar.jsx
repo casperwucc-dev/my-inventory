@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Box, ShoppingCart, TrendingUp, Settings, LogOut, User } from 'lucide-react';
+import { LayoutDashboard, Box, ShoppingCart, TrendingUp, Settings, LogOut, User, Banknote } from 'lucide-react';
 
 const Sidebar = () => {
   const navItems = [
@@ -8,6 +8,7 @@ const Sidebar = () => {
     { name: '庫存管理', icon: <Box size={20} />, path: '/inventory' },
     { name: '進貨管理', icon: <ShoppingCart size={20} />, path: '/purchases' },
     { name: '銷售管理', icon: <TrendingUp size={20} />, path: '/sales' },
+    { name: '零用金管理', icon: <Banknote size={20} />, path: '/petty-cash' },
     { name: '廠商管理', icon: <Settings size={20} />, path: '/suppliers' },
     { name: '客戶管理', icon: <User size={20} />, path: '/customers' },
   ];

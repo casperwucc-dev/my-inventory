@@ -17,7 +17,8 @@ export const INITIAL_DATA = {
   ],
   customers: [
     { id: 'c1', name: '個人客戶-張三', contact: '張三', phone: '0912345678', address: '新北市板橋區' },
-  ]
+  ],
+  pettyCash: []
 };
 
 export const generateId = () => Math.random().toString(36).substr(2, 9);

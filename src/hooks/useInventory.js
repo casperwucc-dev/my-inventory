@@ -66,6 +66,7 @@ export const useInventory = () => {
     sales: data.sales,
     suppliers: data.suppliers,
     customers: data.customers,
+    pettyCash: data.pettyCash || [],
     addProduct,
     updateProduct,
     deleteProduct,
@@ -140,4 +141,42 @@ export const useCustomers = () => {
   };
 
   return { customers: data.customers, addCustomer, updateCustomer, deleteCustomer };
+};
+
+export const usePettyCash = () => {
+  const [data, setData] = useState(() => {
+    const saved = localStorage.getItem('inventory_app_data');
+    return saved ? JSON.parse(saved) : INITIAL_DATA;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('inventory_app_data', JSON.stringify(data));
+  }, [data]);
+
+  const addTransaction = (transaction) => {
+    setData(prev => ({
+      ...prev,
+      pettyCash: [
+        ...prev.pettyCash, 
+        { 
+          ...transaction, 
+          id: 'pc' + Date.now().toString(), 
+          date: new Date().toISOString() 
+        }
+      ]
+    }));
+  };
+
+  const deleteTransaction = (id) => {
+    setData(prev => ({
+      ...prev,
+      pettyCash: prev.pettyCash.filter(t => t.id !== id)
+    }));
+  };
+
+  const balance = (data.pettyCash || []).reduce((acc, t) => {
+    return t.type === 'income' ? acc + Number(t.amount) : acc - Number(t.amount);
+  }, 0);
+
+  return { transactions: data.pettyCash || [], balance, addTransaction, deleteTransaction };
 };
