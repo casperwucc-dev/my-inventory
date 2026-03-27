@@ -1,10 +1,10 @@
-import React from 'react';
-import { useInventory } from '../hooks/useInventory';
+import { useInventory, usePettyCash } from '../hooks/useInventory';
 import StatCard from '../components/Dashboard/StatCard';
-import { Box, ShoppingCart, TrendingUp, AlertTriangle } from 'lucide-react';
+import { Box, ShoppingCart, TrendingUp, AlertTriangle, Wallet } from 'lucide-react';
 
 const Dashboard = () => {
   const { products, purchases, sales } = useInventory();
+  const { balance: pettyCashBalance } = usePettyCash();
 
   const totalStock = products.reduce((acc, p) => acc + p.stock, 0);
   const lowStockCount = products.filter(p => p.stock <= p.minStockAlert).length;
@@ -47,6 +47,12 @@ const Dashboard = () => {
           value={totalSales}
           icon={<TrendingUp size={24} />}
           color="#f59e0b"
+        />
+        <StatCard
+          title="零用金餘額"
+          value={`NT$ ${pettyCashBalance.toLocaleString()}`}
+          icon={<Wallet size={24} />}
+          color="var(--primary-light)"
         />
       </div>
 
