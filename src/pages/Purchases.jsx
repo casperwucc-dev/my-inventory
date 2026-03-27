@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { useInventory } from '../hooks/useInventory';
-import { Plus, ShoppingCart, Search, Calendar } from 'lucide-react';
+import { useInventory, useSuppliers } from '../hooks/useInventory';
+import { Plus, ShoppingCart, Search, Calendar, Loader2 } from 'lucide-react';
 import Modal from '../components/Common/Modal';
 
 const Purchases = () => {
-  const { products, purchases, recordPurchase, suppliers } = useInventory();
+  const { products, purchases, recordPurchase, loading: inventoryLoading } = useInventory();
+  const { suppliers, loading: suppliersLoading } = useSuppliers();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({
     productId: '',
@@ -13,11 +14,16 @@ const Purchases = () => {
     cost: 0
   });
 
-  const handleSubmit = (e) => {
+  const loading = inventoryLoading || suppliersLoading;
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    recordPurchase({
-      ...formData,
-      supplier: suppliers.find(s => s.id === formData.supplierId)?.name || '未知廠商'
+    await recordPurchase({
+      productId: formData.productId,
+      supplierId: formData.supplierId,
+      quantity: formData.quantity,
+      unitPrice: formData.cost / formData.quantity,
+      totalAmount: formData.cost
     });
     setIsModalOpen(false);
     setFormData({ productId: '', quantity: 1, supplierId: '', cost: 0 });
@@ -36,42 +42,48 @@ const Purchases = () => {
         </button>
       </header>
 
-      <div className="card">
-        <div className="table-container">
-          <table>
-            <thead>
-              <tr>
-                <th>交易序號</th>
-                <th>產品名稱</th>
-                <th>供應商</th>
-                <th>數量</th>
-                <th>總成本 (NT$)</th>
-                <th>進貨日期</th>
-              </tr>
-            </thead>
-            <tbody>
-              {purchases.map(p => {
-                const product = products.find(prod => prod.id === p.productId);
-                return (
-                  <tr key={p.id}>
-                    <td style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>#{p.id}</td>
-                    <td style={{ fontWeight: 500 }}>{product?.name || '未知產品'}</td>
-                    <td>{p.supplier}</td>
-                    <td>{p.quantity}</td>
-                    <td>{p.cost?.toLocaleString()}</td>
-                    <td>{new Date(p.date).toLocaleString()}</td>
-                  </tr>
-                );
-              })}
-              {purchases.length === 0 && (
-                <tr>
-                  <td colSpan="6" style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '3rem' }}>尚未有進貨紀錄</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+      {loading && purchases.length === 0 ? (
+        <div className="flex items-center justify-center" style={{ minHeight: '300px' }}>
+          <Loader2 className="animate-spin text-primary" size={40} />
+          <span style={{ marginLeft: '1rem', color: 'var(--text-muted)' }}>載入中...</span>
         </div>
-      </div>
+      ) : (
+        <div className="card">
+          <div className="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>交易序號</th>
+                  <th>產品名稱</th>
+                  <th>供應商</th>
+                  <th>數量</th>
+                  <th>總成本 (NT$)</th>
+                  <th>進貨日期</th>
+                </tr>
+              </thead>
+              <tbody>
+                {purchases.map(p => {
+                  return (
+                    <tr key={p.id}>
+                      <td style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>#{p.id.slice(0, 8)}</td>
+                      <td style={{ fontWeight: 500 }}>{p.products?.name || '未知產品'}</td>
+                      <td>{p.suppliers?.name || '未知廠商'}</td>
+                      <td>{p.quantity}</td>
+                      <td>{p.total_amount?.toLocaleString()}</td>
+                      <td>{new Date(p.date).toLocaleString()}</td>
+                    </tr>
+                  );
+                })}
+                {purchases.length === 0 && (
+                  <tr>
+                    <td colSpan="6" style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '3rem' }}>尚未有進貨紀錄</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       <Modal
         isOpen={isModalOpen}

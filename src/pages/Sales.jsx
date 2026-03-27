@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { useInventory } from '../hooks/useInventory';
-import { Plus, TrendingUp, Search, User } from 'lucide-react';
+import { useInventory, useCustomers } from '../hooks/useInventory';
+import { Plus, TrendingUp, Search, User, Loader2 } from 'lucide-react';
 import Modal from '../components/Common/Modal';
 
 const Sales = () => {
-  const { products, sales, recordSale, customers } = useInventory();
+  const { products, sales, recordSale, loading: inventoryLoading } = useInventory();
+  const { customers, loading: customersLoading } = useCustomers();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({
     productId: '',
@@ -13,17 +14,24 @@ const Sales = () => {
     total: 0
   });
 
-  const handleSubmit = (e) => {
+  const loading = inventoryLoading || customersLoading;
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     const product = products.find(p => p.id === formData.productId);
     if (product && product.stock < formData.quantity) {
       alert('庫存不足，無法完成銷售！');
       return;
     }
-    recordSale({
-      ...formData,
-      customer: customers.find(c => c.id === formData.customerId)?.name || '未知客戶'
+    
+    await recordSale({
+      productId: formData.productId,
+      customerId: formData.customerId,
+      quantity: formData.quantity,
+      unitPrice: product?.price || 0,
+      totalAmount: formData.total
     });
+    
     setIsModalOpen(false);
     setFormData({ productId: '', quantity: 1, customerId: '', total: 0 });
   };
@@ -46,42 +54,48 @@ const Sales = () => {
         </button>
       </header>
 
-      <div className="card">
-        <div className="table-container">
-          <table>
-            <thead>
-              <tr>
-                <th>訂單編號</th>
-                <th>產品名稱</th>
-                <th>客戶</th>
-                <th>數量</th>
-                <th>總金額 (NT$)</th>
-                <th>銷售日期</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sales.map(s => {
-                const product = products.find(prod => prod.id === s.productId);
-                return (
-                  <tr key={s.id}>
-                    <td style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>#{s.id}</td>
-                    <td style={{ fontWeight: 500 }}>{product?.name || '未知產品'}</td>
-                    <td>{s.customer}</td>
-                    <td>{s.quantity}</td>
-                    <td>{s.total?.toLocaleString()}</td>
-                    <td>{new Date(s.date).toLocaleString()}</td>
-                  </tr>
-                );
-              })}
-              {sales.length === 0 && (
-                <tr>
-                  <td colSpan="6" style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '3rem' }}>尚未有銷售紀錄</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+      {loading && sales.length === 0 ? (
+        <div className="flex items-center justify-center" style={{ minHeight: '300px' }}>
+          <Loader2 className="animate-spin text-primary" size={40} />
+          <span style={{ marginLeft: '1rem', color: 'var(--text-muted)' }}>載入中...</span>
         </div>
-      </div>
+      ) : (
+        <div className="card">
+          <div className="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>訂單編號</th>
+                  <th>產品名稱</th>
+                  <th>客戶</th>
+                  <th>數量</th>
+                  <th>總金額 (NT$)</th>
+                  <th>銷售日期</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sales.map(s => {
+                  return (
+                    <tr key={s.id}>
+                      <td style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>#{s.id.slice(0, 8)}</td>
+                      <td style={{ fontWeight: 500 }}>{s.products?.name || '未知產品'}</td>
+                      <td>{s.customers?.name || '未知客戶'}</td>
+                      <td>{s.quantity}</td>
+                      <td>{s.total_amount?.toLocaleString()}</td>
+                      <td>{new Date(s.date).toLocaleString()}</td>
+                    </tr>
+                  );
+                })}
+                {sales.length === 0 && (
+                  <tr>
+                    <td colSpan="6" style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '3rem' }}>尚未有銷售紀錄</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       <Modal
         isOpen={isModalOpen}

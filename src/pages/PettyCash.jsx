@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { usePettyCash } from '../hooks/useInventory';
-import { Plus, Trash2, Wallet, ArrowUpCircle, ArrowDownCircle, Search, Calendar, User } from 'lucide-react';
+import { Plus, Trash2, Wallet, ArrowUpCircle, ArrowDownCircle, Search, Calendar, User, Loader2 } from 'lucide-react';
 import Modal from '../components/Common/Modal';
 
 const PettyCash = () => {
-  const { transactions, balance, addTransaction, deleteTransaction } = usePettyCash();
+  const { transactions, balance, addTransaction, deleteTransaction, loading } = usePettyCash();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [formData, setFormData] = useState({
@@ -15,9 +15,9 @@ const PettyCash = () => {
     payee: ''
   });
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    addTransaction({
+    await addTransaction({
       ...formData,
       amount: Number(formData.amount)
     });
@@ -26,9 +26,9 @@ const PettyCash = () => {
   };
 
   const filtered = transactions.filter(t => 
-    t.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    t.payee.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    t.category.toLowerCase().includes(searchTerm.toLowerCase())
+    (t.description || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (t.payee || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (t.category || '').toLowerCase().includes(searchTerm.toLowerCase())
   ).sort((a, b) => new Date(b.date) - new Date(a.date));
 
   const categories = ['雜支', '交通', '餐費', '撥補', '辦公用品', '其他'];
@@ -57,85 +57,94 @@ const PettyCash = () => {
         </div>
       </header>
 
-      <div className="card m-b-6">
-        <div style={{ position: 'relative' }}>
-          <Search size={18} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-          <input
-            type="text"
-            placeholder="搜尋摘要、對象或類別..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '0.625rem 0.75rem 0.625rem 2.5rem',
-              border: '1px solid var(--border)',
-              borderRadius: '0.5rem',
-              backgroundColor: 'transparent',
-              color: 'inherit'
-            }}
-          />
+      {loading && transactions.length === 0 ? (
+        <div className="flex items-center justify-center" style={{ minHeight: '300px' }}>
+          <Loader2 className="animate-spin text-primary" size={40} />
+          <span style={{ marginLeft: '1rem', color: 'var(--text-muted)' }}>載入中...</span>
         </div>
-      </div>
+      ) : (
+        <>
+          <div className="card m-b-6">
+            <div style={{ position: 'relative' }}>
+              <Search size={18} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+              <input
+                type="text"
+                placeholder="搜尋摘要、對象或類別..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '0.625rem 0.75rem 0.625rem 2.5rem',
+                  border: '1px solid var(--border)',
+                  borderRadius: '0.5rem',
+                  backgroundColor: 'transparent',
+                  color: 'inherit'
+                }}
+              />
+            </div>
+          </div>
 
-      <div className="card">
-        <div className="table-container">
-          <table>
-            <thead>
-              <tr>
-                <th>日期</th>
-                <th>類型</th>
-                <th>摘要</th>
-                <th>類別</th>
-                <th>經手人/對象</th>
-                <th style={{ textAlign: 'right' }}>金額 (NT$)</th>
-                <th style={{ textAlign: 'center' }}>操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map(t => (
-                <tr key={t.id}>
-                  <td style={{ fontSize: '0.875rem' }}>{new Date(t.date).toLocaleDateString()}</td>
-                  <td>
-                    <span style={{ 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      gap: '0.25rem', 
-                      fontSize: '0.75rem', 
-                      fontWeight: 600,
-                      color: t.type === 'income' ? 'var(--success)' : 'var(--danger)'
-                    }}>
-                      {t.type === 'income' ? <ArrowUpCircle size={14} /> : <ArrowDownCircle size={14} />}
-                      {t.type === 'income' ? '撥補' : '支出'}
-                    </span>
-                  </td>
-                  <td style={{ fontWeight: 500 }}>{t.description}</td>
-                  <td><span className="badge">{t.category}</span></td>
-                  <td>{t.payee}</td>
-                  <td style={{ 
-                    textAlign: 'right', 
-                    fontWeight: 'bold',
-                    color: t.type === 'income' ? 'var(--success)' : 'inherit'
-                  }}>
-                    {t.type === 'income' ? '+' : '-'}{t.amount.toLocaleString()}
-                  </td>
-                  <td style={{ textAlign: 'center' }}>
-                    <button className="btn-ghost" style={{ color: 'var(--danger)' }} onClick={() => deleteTransaction(t.id)}>
-                      <Trash2 size={16} />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              {filtered.length === 0 && (
-                <tr>
-                  <td colSpan="7" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
-                    暫無零用金紀錄
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+          <div className="card">
+            <div className="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>日期</th>
+                    <th>類型</th>
+                    <th>摘要</th>
+                    <th>類別</th>
+                    <th>經手人/對象</th>
+                    <th style={{ textAlign: 'right' }}>金額 (NT$)</th>
+                    <th style={{ textAlign: 'center' }}>操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map(t => (
+                    <tr key={t.id}>
+                      <td style={{ fontSize: '0.875rem' }}>{new Date(t.date).toLocaleDateString()}</td>
+                      <td>
+                        <span style={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: '0.25rem', 
+                          fontSize: '0.75rem', 
+                          fontWeight: 600,
+                          color: t.type === 'income' ? 'var(--success)' : 'var(--danger)'
+                        }}>
+                          {t.type === 'income' ? <ArrowUpCircle size={14} /> : <ArrowDownCircle size={14} />}
+                          {t.type === 'income' ? '撥補' : '支出'}
+                        </span>
+                      </td>
+                      <td style={{ fontWeight: 500 }}>{t.description}</td>
+                      <td><span className="badge">{t.category}</span></td>
+                      <td>{t.payee}</td>
+                      <td style={{ 
+                        textAlign: 'right', 
+                        fontWeight: 'bold',
+                        color: t.type === 'income' ? 'var(--success)' : 'inherit'
+                      }}>
+                        {t.type === 'income' ? '+' : '-'}{t.amount.toLocaleString()}
+                      </td>
+                      <td style={{ textAlign: 'center' }}>
+                        <button className="btn-ghost" style={{ color: 'var(--danger)' }} onClick={() => deleteTransaction(t.id)}>
+                          <Trash2 size={16} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  {filtered.length === 0 && (
+                    <tr>
+                      <td colSpan="7" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
+                        暫無零用金紀錄
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
 
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="新增零用金紀錄">
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>

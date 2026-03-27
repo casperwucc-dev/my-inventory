@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { useCustomers } from '../hooks/useInventory';
-import { Plus, Edit2, Trash2, Search, Phone, MapPin, User } from 'lucide-react';
+import { Plus, Edit2, Trash2, Search, Phone, MapPin, User, Loader2 } from 'lucide-react';
 import Modal from '../components/Common/Modal';
 
 const Customers = () => {
-  const { customers, addCustomer, updateCustomer, deleteCustomer } = useCustomers();
+  const { customers, addCustomer, updateCustomer, deleteCustomer, loading } = useCustomers();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -37,8 +37,8 @@ const Customers = () => {
   };
 
   const filtered = customers.filter(c => 
-    c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    c.contact.toLowerCase().includes(searchTerm.toLowerCase())
+    (c.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (c.contact || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -54,49 +54,58 @@ const Customers = () => {
         </button>
       </header>
 
-      <div className="card m-b-6">
-        <div style={{ position: 'relative' }}>
-          <Search size={18} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-          <input
-            type="text"
-            placeholder="搜尋客戶名稱或聯絡人..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '0.625rem 0.75rem 0.625rem 2.5rem',
-              border: '1px solid var(--border)',
-              borderRadius: '0.5rem',
-              backgroundColor: 'transparent',
-              color: 'inherit'
-            }}
-          />
+      {loading && customers.length === 0 ? (
+        <div className="flex items-center justify-center" style={{ minHeight: '300px' }}>
+          <Loader2 className="animate-spin text-primary" size={40} />
+          <span style={{ marginLeft: '1rem', color: 'var(--text-muted)' }}>載入中...</span>
         </div>
-      </div>
+      ) : (
+        <>
+          <div className="card m-b-6">
+            <div style={{ position: 'relative' }}>
+              <Search size={18} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+              <input
+                type="text"
+                placeholder="搜尋客戶名稱或聯絡人..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '0.625rem 0.75rem 0.625rem 2.5rem',
+                  border: '1px solid var(--border)',
+                  borderRadius: '0.5rem',
+                  backgroundColor: 'transparent',
+                  color: 'inherit'
+                }}
+              />
+            </div>
+          </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.5rem' }}>
-        {filtered.map(c => (
-          <div key={c.id} className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <div className="flex justify-between items-start">
-              <h3 style={{ fontSize: '1.25rem', fontWeight: 600 }}>{c.name}</h3>
-              <div className="flex gap-2">
-                <button className="btn-ghost" onClick={() => handleOpenModal(c)}><Edit2 size={16} /></button>
-                <button className="btn-ghost" style={{ color: 'var(--danger)' }} onClick={() => deleteCustomer(c.id)}><Trash2 size={16} /></button>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.5rem' }}>
+            {filtered.map(c => (
+              <div key={c.id} className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div className="flex justify-between items-start">
+                  <h3 style={{ fontSize: '1.25rem', fontWeight: 600 }}>{c.name}</h3>
+                  <div className="flex gap-2">
+                    <button className="btn-ghost" onClick={() => handleOpenModal(c)}><Edit2 size={16} /></button>
+                    <button className="btn-ghost" style={{ color: 'var(--danger)' }} onClick={() => deleteCustomer(c.id)}><Trash2 size={16} /></button>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', color: 'var(--text-muted)', fontSize: '0.875rem' }}>
+                  <div className="flex items-center gap-2"><User size={16} /> 聯絡人: {c.contact}</div>
+                  <div className="flex items-center gap-2"><Phone size={16} /> 電話: {c.phone}</div>
+                  <div className="flex items-center gap-2"><MapPin size={16} /> 地址: {c.address}</div>
+                </div>
               </div>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', color: 'var(--text-muted)', fontSize: '0.875rem' }}>
-              <div className="flex items-center gap-2"><User size={16} /> 聯絡人: {c.contact}</div>
-              <div className="flex items-center gap-2"><Phone size={16} /> 電話: {c.phone}</div>
-              <div className="flex items-center gap-2"><MapPin size={16} /> 地址: {c.address}</div>
-            </div>
+            ))}
+            {filtered.length === 0 && (
+              <div className="card" style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
+                找不到符合條件的客戶
+              </div>
+            )}
           </div>
-        ))}
-        {filtered.length === 0 && (
-          <div className="card" style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
-            找不到符合條件的客戶
-          </div>
-        )}
-      </div>
+        </>
+      )}
 
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingCustomer ? '編輯客戶' : '新增客戶'}>
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>

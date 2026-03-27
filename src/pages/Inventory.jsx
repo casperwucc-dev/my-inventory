@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { useInventory } from '../hooks/useInventory';
-import { Plus, Edit2, Trash2, Search, Filter } from 'lucide-react';
+import { Plus, Edit2, Trash2, Search, Filter, Loader2 } from 'lucide-react';
 import Modal from '../components/Common/Modal';
 
 const Inventory = () => {
-  const { products, addProduct, updateProduct, deleteProduct } = useInventory();
+  const { products, addProduct, updateProduct, deleteProduct, loading } = useInventory();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -43,8 +43,8 @@ const Inventory = () => {
   };
 
   const filteredProducts = products.filter(p => 
-    p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.category.toLowerCase().includes(searchTerm.toLowerCase())
+    (p.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (p.category || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -60,75 +60,89 @@ const Inventory = () => {
         </button>
       </header>
 
-      <div className="card m-b-6" style={{ padding: '1rem' }}>
-        <div className="flex gap-4">
-          <div style={{ position: 'relative', flex: 1 }}>
-            <Search size={18} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-            <input
-              type="text"
-              placeholder="搜尋商品名稱或類別..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '0.625rem 0.75rem 0.625rem 2.5rem',
-                border: '1px solid var(--border)',
-                borderRadius: '0.5rem',
-                backgroundColor: 'transparent',
-                color: 'inherit'
-              }}
-            />
+      {loading && products.length === 0 ? (
+        <div className="flex items-center justify-center" style={{ minHeight: '300px' }}>
+          <Loader2 className="animate-spin text-primary" size={40} />
+          <span style={{ marginLeft: '1rem', color: 'var(--text-muted)' }}>載入中...</span>
+        </div>
+      ) : (
+        <>
+          <div className="card m-b-6" style={{ padding: '1rem' }}>
+            <div className="flex gap-4">
+              <div style={{ position: 'relative', flex: 1 }}>
+                <Search size={18} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                <input
+                  type="text"
+                  placeholder="搜尋商品名稱或類別..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '0.625rem 0.75rem 0.625rem 2.5rem',
+                    border: '1px solid var(--border)',
+                    borderRadius: '0.5rem',
+                    backgroundColor: 'transparent',
+                    color: 'inherit'
+                  }}
+                />
+              </div>
+              <button className="btn btn-ghost" style={{ border: '1px solid var(--border)' }}>
+                <Filter size={18} />
+                篩選
+              </button>
+            </div>
           </div>
-          <button className="btn btn-ghost" style={{ border: '1px solid var(--border)' }}>
-            <Filter size={18} />
-            篩選
-          </button>
-        </div>
-      </div>
 
-      <div className="card">
-        <div className="table-container">
-          <table>
-            <thead>
-              <tr>
-                <th>商品名稱</th>
-                <th>類別</th>
-                <th>單價 (NT$)</th>
-                <th>當前庫存</th>
-                <th>庫存狀態</th>
-                <th style={{ textAlign: 'right' }}>操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredProducts.map(p => (
-                <tr key={p.id}>
-                  <td style={{ fontWeight: 500 }}>{p.name}</td>
-                  <td>{p.category}</td>
-                  <td>{p.price.toLocaleString()}</td>
-                  <td>{p.stock}</td>
-                  <td>
-                    {p.stock <= p.minStockAlert ? (
-                      <span className="badge badge-danger">存貨不足</span>
-                    ) : (
-                      <span className="badge badge-success">充足</span>
-                    )}
-                  </td>
-                  <td style={{ textAlign: 'right' }}>
-                    <div className="flex items-center gap-2" style={{ justifyContent: 'flex-end' }}>
-                      <button className="btn-ghost" onClick={() => handleOpenModal(p)}>
-                        <Edit2 size={16} />
-                      </button>
-                      <button className="btn-ghost" style={{ color: 'var(--danger)' }} onClick={() => deleteProduct(p.id)}>
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+          <div className="card">
+            <div className="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>商品名稱</th>
+                    <th>類別</th>
+                    <th>單價 (NT$)</th>
+                    <th>當前庫存</th>
+                    <th>庫存狀態</th>
+                    <th style={{ textAlign: 'right' }}>操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredProducts.map(p => (
+                    <tr key={p.id}>
+                      <td style={{ fontWeight: 500 }}>{p.name}</td>
+                      <td>{p.category}</td>
+                      <td>{p.price.toLocaleString()}</td>
+                      <td>{p.stock}</td>
+                      <td>
+                        {p.stock <= p.minStockAlert ? (
+                          <span className="badge badge-danger">存貨不足</span>
+                        ) : (
+                          <span className="badge badge-success">充足</span>
+                        )}
+                      </td>
+                      <td style={{ textAlign: 'right' }}>
+                        <div className="flex items-center gap-2" style={{ justifyContent: 'flex-end' }}>
+                          <button className="btn-ghost" onClick={() => handleOpenModal(p)}>
+                            <Edit2 size={16} />
+                          </button>
+                          <button className="btn-ghost" style={{ color: 'var(--danger)' }} onClick={() => deleteProduct(p.id)}>
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  {filteredProducts.length === 0 && (
+                    <tr>
+                      <td colSpan="6" style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '3rem' }}>尚未有商品數據，請新增商品。</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
 
       <Modal
         isOpen={isModalOpen}

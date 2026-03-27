@@ -1,8 +1,21 @@
 import React from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, Box, ShoppingCart, TrendingUp, Settings, LogOut, User, Banknote } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
 const Sidebar = () => {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate('/login');
+    } catch (err) {
+      console.error('Logout error:', err.message);
+    }
+  };
+
   const navItems = [
     { name: '儀表板', icon: <LayoutDashboard size={20} />, path: '/' },
     { name: '庫存管理', icon: <Box size={20} />, path: '/inventory' },
@@ -55,9 +68,17 @@ const Sidebar = () => {
       </nav>
 
       <div className="sidebar-footer" style={{ marginTop: 'auto', paddingTop: '1.5rem', borderTop: '1px solid #334155' }}>
-        <button className="btn-ghost" style={{ width: '100%', justifyContent: 'flex-start', color: '#94a3b8' }}>
+        <div style={{ marginBottom: '1rem', padding: '0 0.5rem', fontSize: '0.75rem', color: '#94a3b8' }}>
+          <div style={{ fontWeight: 600, color: 'white', marginBottom: '0.25rem' }}>目前登入:</div>
+          <div style={{ wordBreak: 'break-all' }}>{user?.email}</div>
+        </div>
+        <button 
+          onClick={handleLogout}
+          className="btn-ghost" 
+          style={{ width: '100%', justifyContent: 'flex-start', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.5rem' }}
+        >
           <LogOut size={20} />
-          <span>登出</span>
+          <span>登出系統</span>
         </button>
       </div>
     </aside>

@@ -1,182 +1,283 @@
 import { useState, useEffect } from 'react';
-import { INITIAL_DATA } from '../utils/dataSchema';
+import { supabase } from '../utils/supabase';
+
+// Helper to handle Supabase errors
+const handleError = (error, message) => {
+  if (error) {
+    console.error(`${message}:`, error.message);
+    throw error;
+  }
+};
 
 export const useInventory = () => {
-  const [data, setData] = useState(() => {
-    const saved = localStorage.getItem('inventory_app_data');
-    return saved ? JSON.parse(saved) : INITIAL_DATA;
-  });
+  const [products, setProducts] = useState([]);
+  const [purchases, setPurchases] = useState([]);
+  const [sales, setSales] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchInventoryData = async () => {
+    try {
+      setLoading(true);
+      const { data: productsData, error: productsError } = await supabase
+        .from('products')
+        .select('*')
+        .order('name');
+      
+      if (productsError) {
+        console.error('Error fetching products:', productsError.message);
+      } else if (productsData) {
+        setProducts(productsData.map(p => ({ ...p, minStockAlert: p.min_stock_alert })));
+      }
+      
+      const { data: purchasesData, error: purchasesError } = await supabase
+        .from('purchases')
+        .select('*, products(name), suppliers(name)')
+        .order('date', { ascending: false });
+      
+      if (purchasesError) {
+        console.error('Error fetching purchases:', purchasesError.message);
+      } else if (purchasesData) {
+        setPurchases(purchasesData);
+      }
+
+      const { data: salesData, error: salesError } = await supabase
+        .from('sales')
+        .select('*, products(name), customers(name)')
+        .order('date', { ascending: false });
+      
+      if (salesError) {
+        console.error('Error fetching sales:', salesError.message);
+      } else if (salesData) {
+        setSales(salesData);
+      }
+    } catch (err) {
+      console.error('Unexpected error fetching data:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    localStorage.setItem('inventory_app_data', JSON.stringify(data));
-  }, [data]);
+    fetchInventoryData();
+  }, []);
 
-  const addProduct = (product) => {
-    setData(prev => ({
-      ...prev,
-      products: [...prev.products, { ...product, id: Date.now().toString() }]
-    }));
+  const addProduct = async (product) => {
+    const { data, error } = await supabase
+      .from('products')
+      .insert([{
+        name: product.name,
+        category: product.category,
+        price: product.price,
+        stock: product.stock,
+        min_stock_alert: product.minStockAlert
+      }])
+      .select();
+    handleError(error, 'Error adding product');
+    fetchInventoryData();
+    return data[0];
   };
 
-  const updateProduct = (id, updatedProduct) => {
-    setData(prev => ({
-      ...prev,
-      products: prev.products.map(p => p.id === id ? { ...p, ...updatedProduct } : p)
-    }));
+  const updateProduct = async (id, updatedProduct) => {
+    const { error } = await supabase
+      .from('products')
+      .update({
+        name: updatedProduct.name,
+        category: updatedProduct.category,
+        price: updatedProduct.price,
+        stock: updatedProduct.stock,
+        min_stock_alert: updatedProduct.minStockAlert
+      })
+      .eq('id', id);
+    handleError(error, 'Error updating product');
+    fetchInventoryData();
   };
 
-  const deleteProduct = (id) => {
-    setData(prev => ({
-      ...prev,
-      products: prev.products.filter(p => p.id !== id)
-    }));
+  const deleteProduct = async (id) => {
+    const { error } = await supabase
+      .from('products')
+      .delete()
+      .eq('id', id);
+    handleError(error, 'Error deleting product');
+    fetchInventoryData();
   };
 
-  const recordPurchase = (purchase) => {
-    const newPurchase = { ...purchase, id: Date.now().toString(), date: new Date().toISOString() };
-    setData(prev => {
-      const updatedProducts = prev.products.map(p => 
-        p.id === purchase.productId ? { ...p, stock: p.stock + purchase.quantity } : p
-      );
-      return {
-        ...prev,
-        purchases: [newPurchase, ...prev.purchases],
-        products: updatedProducts
-      };
-    });
+  const recordPurchase = async (purchase) => {
+    const { error: purchaseError } = await supabase
+      .from('purchases')
+      .insert([{
+        product_id: purchase.productId,
+        supplier_id: purchase.supplierId,
+        quantity: purchase.quantity,
+        unit_price: purchase.unitPrice,
+        total_amount: purchase.totalAmount
+      }]);
+    handleError(purchaseError, 'Error recording purchase');
+
+    // Update stock
+    const product = products.find(p => p.id === purchase.productId);
+    const { error: stockError } = await supabase
+      .from('products')
+      .update({ stock: product.stock + purchase.quantity })
+      .eq('id', purchase.productId);
+    handleError(stockError, 'Error updating product stock');
+
+    fetchInventoryData();
   };
 
-  const recordSale = (sale) => {
-    const newSale = { ...sale, id: Date.now().toString(), date: new Date().toISOString() };
-    setData(prev => {
-      const updatedProducts = prev.products.map(p => 
-        p.id === sale.productId ? { ...p, stock: p.stock - sale.quantity } : p
-      );
-      return {
-        ...prev,
-        sales: [newSale, ...prev.sales],
-        products: updatedProducts
-      };
-    });
+  const recordSale = async (sale) => {
+    const { error: saleError } = await supabase
+      .from('sales')
+      .insert([{
+        product_id: sale.productId,
+        customer_id: sale.customerId,
+        quantity: sale.quantity,
+        unit_price: sale.unitPrice,
+        total_amount: sale.totalAmount
+      }]);
+    handleError(saleError, 'Error recording sale');
+
+    // Update stock
+    const product = products.find(p => p.id === sale.productId);
+    const { error: stockError } = await supabase
+      .from('products')
+      .update({ stock: product.stock - sale.quantity })
+      .eq('id', sale.productId);
+    handleError(stockError, 'Error updating product stock');
+
+    fetchInventoryData();
   };
 
   return {
-    products: data.products,
-    purchases: data.purchases,
-    sales: data.sales,
-    suppliers: data.suppliers,
-    customers: data.customers,
-    pettyCash: data.pettyCash || [],
+    products,
+    purchases,
+    sales,
+    loading,
     addProduct,
     updateProduct,
     deleteProduct,
     recordPurchase,
-    recordSale
+    recordSale,
+    refreshInventory: fetchInventoryData
   };
 };
 
 export const useSuppliers = () => {
-  const [data, setData] = useState(() => {
-    const saved = localStorage.getItem('inventory_app_data');
-    return saved ? JSON.parse(saved) : INITIAL_DATA;
-  });
+  const [suppliers, setSuppliers] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchSuppliers = async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('suppliers')
+      .select('*')
+      .order('name');
+    if (!error) setSuppliers(data);
+    setLoading(false);
+  };
 
   useEffect(() => {
-    localStorage.setItem('inventory_app_data', JSON.stringify(data));
-  }, [data]);
+    fetchSuppliers();
+  }, []);
 
-  const addSupplier = (supplier) => {
-    setData(prev => ({
-      ...prev,
-      suppliers: [...prev.suppliers, { ...supplier, id: 's' + Date.now().toString() }]
-    }));
+  const addSupplier = async (supplier) => {
+    const { error } = await supabase.from('suppliers').insert([supplier]);
+    handleError(error, 'Error adding supplier');
+    fetchSuppliers();
   };
 
-  const updateSupplier = (id, updated) => {
-    setData(prev => ({
-      ...prev,
-      suppliers: prev.suppliers.map(s => s.id === id ? { ...s, ...updated } : s)
-    }));
+  const updateSupplier = async (id, updated) => {
+    const { error } = await supabase.from('suppliers').update(updated).eq('id', id);
+    handleError(error, 'Error updating supplier');
+    fetchSuppliers();
   };
 
-  const deleteSupplier = (id) => {
-    setData(prev => ({
-      ...prev,
-      suppliers: prev.suppliers.filter(s => s.id !== id)
-    }));
+  const deleteSupplier = async (id) => {
+    const { error } = await supabase.from('suppliers').delete().eq('id', id);
+    handleError(error, 'Error deleting supplier');
+    fetchSuppliers();
   };
 
-  return { suppliers: data.suppliers, addSupplier, updateSupplier, deleteSupplier };
+  return { suppliers, loading, addSupplier, updateSupplier, deleteSupplier };
 };
 
 export const useCustomers = () => {
-  const [data, setData] = useState(() => {
-    const saved = localStorage.getItem('inventory_app_data');
-    return saved ? JSON.parse(saved) : INITIAL_DATA;
-  });
+  const [customers, setCustomers] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchCustomers = async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('customers')
+      .select('*')
+      .order('name');
+    if (!error) setCustomers(data);
+    setLoading(false);
+  };
 
   useEffect(() => {
-    localStorage.setItem('inventory_app_data', JSON.stringify(data));
-  }, [data]);
+    fetchCustomers();
+  }, []);
 
-  const addCustomer = (customer) => {
-    setData(prev => ({
-      ...prev,
-      customers: [...prev.customers, { ...customer, id: 'c' + Date.now().toString() }]
-    }));
+  const addCustomer = async (customer) => {
+    const { error } = await supabase.from('customers').insert([customer]);
+    handleError(error, 'Error adding customer');
+    fetchCustomers();
   };
 
-  const updateCustomer = (id, updated) => {
-    setData(prev => ({
-      ...prev,
-      customers: prev.customers.map(c => c.id === id ? { ...c, ...updated } : c)
-    }));
+  const updateCustomer = async (id, updated) => {
+    const { error } = await supabase.from('customers').update(updated).eq('id', id);
+    handleError(error, 'Error updating customer');
+    fetchCustomers();
   };
 
-  const deleteCustomer = (id) => {
-    setData(prev => ({
-      ...prev,
-      customers: prev.customers.filter(c => c.id !== id)
-    }));
+  const deleteCustomer = async (id) => {
+    const { error } = await supabase.from('customers').delete().eq('id', id);
+    handleError(error, 'Error deleting customer');
+    fetchCustomers();
   };
 
-  return { customers: data.customers, addCustomer, updateCustomer, deleteCustomer };
+  return { customers, loading, addCustomer, updateCustomer, deleteCustomer };
 };
 
 export const usePettyCash = () => {
-  const [data, setData] = useState(() => {
-    const saved = localStorage.getItem('inventory_app_data');
-    return saved ? JSON.parse(saved) : INITIAL_DATA;
-  });
+  const [transactions, setTransactions] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchTransactions = async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('petty_cash')
+      .select('*')
+      .order('date', { ascending: false });
+    if (!error) setTransactions(data);
+    setLoading(false);
+  };
 
   useEffect(() => {
-    localStorage.setItem('inventory_app_data', JSON.stringify(data));
-  }, [data]);
+    fetchTransactions();
+  }, []);
 
-  const addTransaction = (transaction) => {
-    setData(prev => ({
-      ...prev,
-      pettyCash: [
-        ...prev.pettyCash, 
-        { 
-          ...transaction, 
-          id: 'pc' + Date.now().toString(), 
-          date: new Date().toISOString() 
-        }
-      ]
-    }));
+  const addTransaction = async (transaction) => {
+    const { error } = await supabase.from('petty_cash').insert([{
+      type: transaction.type,
+      amount: transaction.amount,
+      category: transaction.category,
+      payee: transaction.payee,
+      description: transaction.description
+    }]);
+    handleError(error, 'Error adding transaction');
+    fetchTransactions();
   };
 
-  const deleteTransaction = (id) => {
-    setData(prev => ({
-      ...prev,
-      pettyCash: prev.pettyCash.filter(t => t.id !== id)
-    }));
+  const deleteTransaction = async (id) => {
+    const { error } = await supabase.from('petty_cash').delete().eq('id', id);
+    handleError(error, 'Error deleting transaction');
+    fetchTransactions();
   };
 
-  const balance = (data.pettyCash || []).reduce((acc, t) => {
+  const balance = transactions.reduce((acc, t) => {
     return t.type === 'income' ? acc + Number(t.amount) : acc - Number(t.amount);
   }, 0);
 
-  return { transactions: data.pettyCash || [], balance, addTransaction, deleteTransaction };
+  return { transactions, balance, loading, addTransaction, deleteTransaction };
 };
