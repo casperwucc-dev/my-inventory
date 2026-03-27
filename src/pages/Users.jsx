@@ -181,6 +181,7 @@ const Users = () => {
                     value={formData.email} 
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })} 
                     placeholder="example@gmail.com"
+                    autoComplete="off"
                     style={{ width: '100%', padding: '0.625rem 0.75rem 0.625rem 2.25rem', border: '1px solid var(--border)', borderRadius: '0.375rem', backgroundColor: 'transparent', color: 'inherit' }} 
                   />
                 </div>
@@ -196,6 +197,7 @@ const Users = () => {
                     value={formData.password} 
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })} 
                     placeholder="至少 6 位字元"
+                    autoComplete="new-password"
                     style={{ width: '100%', padding: '0.625rem 0.75rem 0.625rem 2.25rem', border: '1px solid var(--border)', borderRadius: '0.375rem', backgroundColor: 'transparent', color: 'inherit' }} 
                   />
                 </div>
