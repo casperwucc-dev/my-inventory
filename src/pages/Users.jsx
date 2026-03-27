@@ -78,6 +78,15 @@ const Users = () => {
           full_name: formData.full_name,
           role: formData.role
         });
+
+        // 2. If a new password was provided, call the Edge Function
+        if (formData.password) {
+          const { data, error: functionError } = await signupClient.functions.invoke('admin-manage-user', {
+            body: { userId: editingUser.id, newPassword: formData.password }
+          });
+          
+          if (functionError) throw functionError;
+        }
       }
       setIsModalOpen(false);
     } catch (err) {
@@ -214,6 +223,25 @@ const Users = () => {
               style={{ padding: '0.625rem', border: '1px solid var(--border)', borderRadius: '0.375rem', backgroundColor: 'transparent', color: 'inherit' }} 
             />
           </div>
+          {!isAddMode && (
+            <div className="flex flex-col gap-2">
+              <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>
+                變更密碼 <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>(若不變更請留空)</span>
+              </label>
+              <div style={{ position: 'relative' }}>
+                <Lock size={16} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                <input 
+                  type="password" 
+                  minLength="6"
+                  value={formData.password} 
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })} 
+                  placeholder="設定新密碼"
+                  autoComplete="new-password"
+                  style={{ width: '100%', padding: '0.625rem 0.75rem 0.625rem 2.25rem', border: '1px solid var(--border)', borderRadius: '0.375rem', backgroundColor: 'transparent', color: 'inherit' }} 
+                />
+              </div>
+            </div>
+          )}
           <div className="flex flex-col gap-2">
             <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>權限群組</label>
             <select 
