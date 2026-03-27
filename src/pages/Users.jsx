@@ -72,7 +72,6 @@ const Users = () => {
           await updateProfile(signUpData.user.id, { role: formData.role });
         }
 
-        alert('使用者帳號建立成功！\n若您有開啟 Email 驗證，請通知使用者查看信箱。');
         await fetchUsers();
       } else {
         await updateProfile(editingUser.id, {
