@@ -12,8 +12,7 @@ const PettyCash = () => {
     amount: '',
     category: '雜支',
     accountingItem: '雜費',
-    description: '',
-    payee: ''
+    description: ''
   });
 
   const handleSubmit = async (e) => {
@@ -23,12 +22,11 @@ const PettyCash = () => {
       amount: Number(formData.amount)
     });
     setIsModalOpen(false);
-    setFormData({ type: 'expense', amount: '', category: '雜支', accountingItem: '雜費', description: '', payee: '' });
+    setFormData({ type: 'expense', amount: '', category: '雜支', accountingItem: '雜費', description: '' });
   };
 
   const filtered = transactions.filter(t => 
     (t.description || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (t.payee || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
     (t.category || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
     (t.accounting_item || '').toLowerCase().includes(searchTerm.toLowerCase())
   ).sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -82,7 +80,7 @@ const PettyCash = () => {
               <Search size={18} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
               <input
                 type="text"
-                placeholder="搜尋摘要、對象、類別或會計科目..."
+                placeholder="搜尋摘要、類別或會計科目..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 style={{
@@ -106,7 +104,6 @@ const PettyCash = () => {
                     <th>摘要</th>
                     <th>會計科目</th>
                     <th>類別</th>
-                    <th>對象</th>
                     <th style={{ textAlign: 'right' }}>金額 (NT$)</th>
                     <th style={{ textAlign: 'center' }}>操作</th>
                   </tr>
@@ -125,7 +122,6 @@ const PettyCash = () => {
                       </td>
                       <td><span style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>{t.accounting_item || '-'}</span></td>
                       <td><span className="badge">{t.category}</span></td>
-                      <td>{t.payee}</td>
                       <td style={{ 
                         textAlign: 'right', 
                         fontWeight: 'bold',
@@ -142,7 +138,7 @@ const PettyCash = () => {
                   ))}
                   {filtered.length === 0 && (
                     <tr>
-                      <td colSpan="7" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
+                      <td colSpan="6" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
                         暫無零用金紀錄
                       </td>
                     </tr>
@@ -207,16 +203,6 @@ const PettyCash = () => {
                 {currentCategories.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
-          </div>
-          <div className="flex flex-col gap-2">
-            <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>經手人/對象</label>
-            <input 
-              required 
-              type="text" 
-              value={formData.payee} 
-              onChange={(e) => setFormData({ ...formData, payee: e.target.value })} 
-              style={{ padding: '0.625rem', border: '1px solid var(--border)', borderRadius: '0.375rem', backgroundColor: 'transparent', color: 'inherit' }} 
-            />
           </div>
           <div className="flex flex-col gap-2">
             <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>摘要/備註</label>

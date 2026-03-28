@@ -411,7 +411,6 @@ export const usePettyCash = () => {
       amount: transaction.amount,
       category: transaction.category,
       accounting_item: transaction.accountingItem,
-      payee: transaction.payee,
       description: transaction.description
     }]);
     handleError(error, 'Error adding transaction');
