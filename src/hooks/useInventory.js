@@ -429,3 +429,41 @@ export const usePettyCash = () => {
 
   return { transactions, balance, loading, addTransaction, deleteTransaction };
 };
+
+export const usePettyCashCategories = () => {
+  const [categories, setCategories] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchCategories = async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('petty_cash_categories')
+      .select('*')
+      .order('accounting_item', { ascending: true });
+    if (!error) setCategories(data);
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchCategories();
+  }, []);
+
+  const addCategory = async (accountingItem, category) => {
+    const { error } = await supabase
+      .from('petty_cash_categories')
+      .insert([{ accounting_item: accountingItem, category }]);
+    handleError(error, 'Error adding category');
+    fetchCategories();
+  };
+
+  const deleteCategory = async (id) => {
+    const { error } = await supabase
+      .from('petty_cash_categories')
+      .delete()
+      .eq('id', id);
+    handleError(error, 'Error deleting category');
+    fetchCategories();
+  };
+
+  return { categories, loading, addCategory, deleteCategory };
+};

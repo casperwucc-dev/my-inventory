@@ -1,19 +1,45 @@
-import React, { useState } from 'react';
-import { usePettyCash } from '../hooks/useInventory';
-import { Plus, Trash2, Wallet, ArrowUpCircle, ArrowDownCircle, Search, Calendar, User, Loader2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { usePettyCash, usePettyCashCategories } from '../hooks/useInventory';
+import { Plus, Trash2, Wallet, ArrowUpCircle, ArrowDownCircle, Search, Calendar, User, Loader2, Settings, X } from 'lucide-react';
 import Modal from '../components/Common/Modal';
 
 const PettyCash = () => {
-  const { transactions, balance, addTransaction, deleteTransaction, loading } = usePettyCash();
+  const { transactions, balance, addTransaction, deleteTransaction, loading: transLoading } = usePettyCash();
+  const { categories: dbCategories, addCategory, deleteCategory, loading: catLoading } = usePettyCashCategories();
+  
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [formData, setFormData] = useState({
     type: 'expense',
     amount: '',
-    category: '雜支',
-    accountingItem: '雜費',
+    category: '',
+    accountingItem: '',
     description: ''
   });
+
+  // Category Management State
+  const [newCat, setNewCat] = useState({ accountingItem: '', category: '' });
+
+  // Transform flat database categories into ACCOUNTING_MAP structure
+  const ACCOUNTING_MAP = dbCategories.reduce((acc, cat) => {
+    if (!acc[cat.accounting_item]) acc[cat.accounting_item] = [];
+    acc[cat.accounting_item].push(cat.category);
+    return acc;
+  }, {});
+
+  const accountingItems = Object.keys(ACCOUNTING_MAP);
+  
+  // Initialize form with defaults once categories are loaded
+  useEffect(() => {
+    if (accountingItems.length > 0 && !formData.accountingItem) {
+      setFormData(prev => ({
+        ...prev,
+        accountingItem: accountingItems[0],
+        category: ACCOUNTING_MAP[accountingItems[0]][0]
+      }));
+    }
+  }, [dbCategories]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -22,7 +48,20 @@ const PettyCash = () => {
       amount: Number(formData.amount)
     });
     setIsModalOpen(false);
-    setFormData({ type: 'expense', amount: '', category: '雜支', accountingItem: '雜費', description: '' });
+    setFormData({ 
+      type: 'expense', 
+      amount: '', 
+      accountingItem: accountingItems[0] || '', 
+      category: (ACCOUNTING_MAP[accountingItems[0]] || [])[0] || '', 
+      description: '' 
+    });
+  };
+
+  const handleAddCategory = async (e) => {
+    e.preventDefault();
+    if (!newCat.accountingItem || !newCat.category) return;
+    await addCategory(newCat.accountingItem, newCat.category);
+    setNewCat({ accountingItem: '', category: '' });
   };
 
   const filtered = transactions.filter(t => 
@@ -31,18 +70,7 @@ const PettyCash = () => {
     (t.accounting_item || '').toLowerCase().includes(searchTerm.toLowerCase())
   ).sort((a, b) => new Date(b.date) - new Date(a.date));
 
-  const ACCOUNTING_MAP = {
-    '郵電費': ['掛號', '電話', '快遞', '郵寄'],
-    '差旅費': ['計程車', '油資', '大眾運輸', '住宿'],
-    '修繕費': ['電腦維修', '水電維修', '冷氣保養', '其他維修'],
-    '交際費': ['餐費', '禮品', '其他'],
-    '水電費': ['水費', '電費', '瓦斯費'],
-    '雜費': ['文具', '清潔用品', '飲品', '其他雜購'],
-    '其他': ['其他']
-  };
-
-  const accountingItems = Object.keys(ACCOUNTING_MAP);
-  const currentCategories = ACCOUNTING_MAP[formData.accountingItem] || ['其他'];
+  const currentCategories = ACCOUNTING_MAP[formData.accountingItem] || [];
 
   return (
     <div className="petty-cash-page">
@@ -68,7 +96,7 @@ const PettyCash = () => {
         </div>
       </header>
 
-      {loading && transactions.length === 0 ? (
+      {(transLoading || catLoading) && transactions.length === 0 ? (
         <div className="flex items-center justify-center" style={{ minHeight: '300px' }}>
           <Loader2 className="animate-spin text-primary" size={40} />
           <span style={{ marginLeft: '1rem', color: 'var(--text-muted)' }}>載入中...</span>
@@ -150,6 +178,7 @@ const PettyCash = () => {
         </>
       )}
 
+      {/* Main Entry Modal */}
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="新增零用金紀錄">
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
@@ -178,29 +207,43 @@ const PettyCash = () => {
           {formData.type === 'expense' && (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
               <div className="flex flex-col gap-2">
-                <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>會計科目</label>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>會計科目</label>
+                  <button type="button" onClick={() => setIsSettingsOpen(true)} className="btn-ghost" style={{ padding: '2px', color: 'var(--primary)' }} title="管理科目">
+                    <Settings size={14} />
+                  </button>
+                </div>
                 <select 
                   value={formData.accountingItem} 
+                  required
                   onChange={(e) => {
                     const val = e.target.value;
                     setFormData({ 
                       ...formData, 
                       accountingItem: val,
-                      category: ACCOUNTING_MAP[val]?.[0] || '其他'
+                      category: (ACCOUNTING_MAP[val] || [])[0] || ''
                     });
                   }}
                   style={{ padding: '0.625rem', border: '1px solid var(--border)', borderRadius: '0.375rem', backgroundColor: 'transparent', color: 'inherit' }}
                 >
+                  <option value="">請選擇...</option>
                   {accountingItems.map(item => <option key={item} value={item}>{item}</option>)}
                 </select>
               </div>
               <div className="flex flex-col gap-2">
-                <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>類別</label>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>類別</label>
+                  <button type="button" onClick={() => setIsSettingsOpen(true)} className="btn-ghost" style={{ padding: '2px', color: 'var(--primary)' }} title="管理類別">
+                    <Settings size={14} />
+                  </button>
+                </div>
                 <select 
                   value={formData.category} 
+                  required
                   onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                   style={{ padding: '0.625rem', border: '1px solid var(--border)', borderRadius: '0.375rem', backgroundColor: 'transparent', color: 'inherit' }}
                 >
+                  <option value="">請選擇...</option>
                   {currentCategories.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
@@ -221,6 +264,74 @@ const PettyCash = () => {
             <button type="submit" className="btn btn-primary">確認新增</button>
           </div>
         </form>
+      </Modal>
+
+      {/* Category Settings Modal */}
+      <Modal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} title="管理會計科目與類別">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          <form onSubmit={handleAddCategory} className="card" style={{ padding: '1rem', border: '1px solid var(--primary-light)', backgroundColor: 'rgba(59, 130, 246, 0.05)' }}>
+            <h3 style={{ fontSize: '0.875rem', fontWeight: 600, marginBottom: '0.75rem' }}>新增科目對應</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '0.75rem', alignItems: 'flex-end' }}>
+              <div className="flex flex-col gap-1">
+                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>會計科目 (大項)</label>
+                <input 
+                  required
+                  type="text"
+                  placeholder="如: 郵電費"
+                  value={newCat.accountingItem}
+                  onChange={(e) => setNewCat({...newCat, accountingItem: e.target.value})}
+                  list="existing-items"
+                  style={{ padding: '0.5rem', border: '1px solid var(--border)', borderRadius: '0.375rem', backgroundColor: 'var(--card)', color: 'inherit' }}
+                />
+                <datalist id="existing-items">
+                  {accountingItems.map(item => <option key={item} value={item} />)}
+                </datalist>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>類別 (子項)</label>
+                <input 
+                  required
+                  type="text"
+                  placeholder="如: 電話費"
+                  value={newCat.category}
+                  onChange={(e) => setNewCat({...newCat, category: e.target.value})}
+                  style={{ padding: '0.5rem', border: '1px solid var(--border)', borderRadius: '0.375rem', backgroundColor: 'var(--card)', color: 'inherit' }}
+                />
+              </div>
+              <button type="submit" className="btn btn-primary" style={{ height: '38px', padding: '0 1rem' }}>新增</button>
+            </div>
+          </form>
+
+          <div className="table-container" style={{ maxHeight: '400px', overflowY: 'auto' }}>
+            <table style={{ fontSize: '0.875rem' }}>
+              <thead style={{ position: 'sticky', top: 0, zIndex: 1, backgroundColor: 'var(--card)' }}>
+                <tr>
+                  <th>會計科目</th>
+                  <th>類別</th>
+                  <th style={{ textAlign: 'center' }}>操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                {dbCategories.map(cat => (
+                  <tr key={cat.id}>
+                    <td style={{ fontWeight: 500 }}>{cat.accounting_item}</td>
+                    <td>{cat.category}</td>
+                    <td style={{ textAlign: 'center' }}>
+                      <button className="btn-ghost" style={{ color: 'var(--danger)', padding: '4px' }} onClick={() => deleteCategory(cat.id)}>
+                        <X size={14} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {dbCategories.length === 0 && (
+                  <tr>
+                    <td colSpan="3" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>尚未設定任何科目</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </Modal>
     </div>
   );
