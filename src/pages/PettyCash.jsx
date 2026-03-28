@@ -33,8 +33,18 @@ const PettyCash = () => {
     (t.accounting_item || '').toLowerCase().includes(searchTerm.toLowerCase())
   ).sort((a, b) => new Date(b.date) - new Date(a.date));
 
-  const categories = ['雜支', '交通', '餐費', '撥補', '辦公用品', '其他'];
-  const accountingItems = ['雜費', '郵電費', '修繕費', '差旅費', '交際費', '水電費', '其他'];
+  const ACCOUNTING_MAP = {
+    '郵電費': ['掛號', '電話', '快遞', '郵寄'],
+    '差旅費': ['計程車', '油資', '大眾運輸', '住宿'],
+    '修繕費': ['電腦維修', '水電維修', '冷氣保養', '其他維修'],
+    '交際費': ['餐費', '禮品', '其他'],
+    '水電費': ['水費', '電費', '瓦斯費'],
+    '雜費': ['文具', '清潔用品', '飲品', '其他雜購'],
+    '其他': ['其他']
+  };
+
+  const accountingItems = Object.keys(ACCOUNTING_MAP);
+  const currentCategories = ACCOUNTING_MAP[formData.accountingItem] || ['其他'];
 
   return (
     <div className="petty-cash-page">
@@ -174,7 +184,14 @@ const PettyCash = () => {
               <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>會計科目</label>
               <select 
                 value={formData.accountingItem} 
-                onChange={(e) => setFormData({ ...formData, accountingItem: e.target.value })}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setFormData({ 
+                    ...formData, 
+                    accountingItem: val,
+                    category: ACCOUNTING_MAP[val]?.[0] || '其他'
+                  });
+                }}
                 style={{ padding: '0.625rem', border: '1px solid var(--border)', borderRadius: '0.375rem', backgroundColor: 'transparent', color: 'inherit' }}
               >
                 {accountingItems.map(item => <option key={item} value={item}>{item}</option>)}
@@ -187,7 +204,7 @@ const PettyCash = () => {
                 onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                 style={{ padding: '0.625rem', border: '1px solid var(--border)', borderRadius: '0.375rem', backgroundColor: 'transparent', color: 'inherit' }}
               >
-                {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                {currentCategories.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
           </div>
