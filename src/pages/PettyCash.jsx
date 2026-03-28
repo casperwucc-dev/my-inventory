@@ -231,12 +231,7 @@ const PettyCash = () => {
                 </select>
               </div>
               <div className="flex flex-col gap-2">
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>類別</label>
-                  <button type="button" onClick={() => setIsSettingsOpen(true)} className="btn-ghost" style={{ padding: '2px', color: 'var(--primary)' }} title="管理類別">
-                    <Settings size={14} />
-                  </button>
-                </div>
+                <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>類別</label>
                 <select 
                   value={formData.category} 
                   required
