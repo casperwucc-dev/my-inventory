@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { usePettyCash, usePettyCashCategories } from '../hooks/useInventory';
-import { Plus, Trash2, Wallet, ArrowUpCircle, ArrowDownCircle, Search, Calendar, User, Loader2, Settings, X } from 'lucide-react';
+import { Plus, Trash2, Wallet, ArrowUpCircle, ArrowDownCircle, Search, Calendar, User, Loader2, Settings, X, ChevronDown, ChevronRight } from 'lucide-react';
 import Modal from '../components/Common/Modal';
 
 const PettyCash = () => {
@@ -20,6 +20,17 @@ const PettyCash = () => {
 
   // Category Management State
   const [newCat, setNewCat] = useState({ accountingItem: '', category: '' });
+  const [expandedAccounts, setExpandedAccounts] = useState({});
+
+  const toggleAccount = (act) => {
+    setExpandedAccounts(prev => ({...prev, [act]: !prev[act]}));
+  };
+
+  const categorizedForSettings = dbCategories.reduce((acc, cat) => {
+    if (!acc[cat.accounting_item]) acc[cat.accounting_item] = [];
+    acc[cat.accounting_item].push(cat);
+    return acc;
+  }, {});
 
   // Transform flat database categories into ACCOUNTING_MAP structure
   const ACCOUNTING_MAP = dbCategories.reduce((acc, cat) => {
@@ -307,16 +318,31 @@ const PettyCash = () => {
                 </tr>
               </thead>
               <tbody>
-                {dbCategories.map(cat => (
-                  <tr key={cat.id}>
-                    <td style={{ fontWeight: 500 }}>{cat.accounting_item}</td>
-                    <td>{cat.category}</td>
-                    <td style={{ textAlign: 'center' }}>
-                      <button className="btn-ghost" style={{ color: 'var(--danger)', padding: '4px' }} onClick={() => deleteCategory(cat.id)}>
-                        <X size={14} />
-                      </button>
-                    </td>
-                  </tr>
+                {Object.entries(categorizedForSettings).map(([accountingItem, subCats]) => (
+                  <React.Fragment key={accountingItem}>
+                    <tr style={{ cursor: 'pointer', backgroundColor: 'var(--card-hover)' }} onClick={() => toggleAccount(accountingItem)}>
+                      <td style={{ fontWeight: 600 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          {expandedAccounts[accountingItem] ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                          {accountingItem}
+                        </div>
+                      </td>
+                      <td colSpan="2" style={{ color: 'var(--text-muted)' }}>
+                        共 {subCats.length} 個類別
+                      </td>
+                    </tr>
+                    {expandedAccounts[accountingItem] && subCats.map(cat => (
+                      <tr key={cat.id} style={{ backgroundColor: 'rgba(0,0,0,0.02)' }}>
+                        <td style={{ paddingLeft: '2.5rem' }}></td>
+                        <td>{cat.category}</td>
+                        <td style={{ textAlign: 'center' }}>
+                          <button className="btn-ghost" style={{ color: 'var(--danger)', padding: '4px' }} onClick={(e) => { e.stopPropagation(); deleteCategory(cat.id); }}>
+                            <X size={14} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </React.Fragment>
                 ))}
                 {dbCategories.length === 0 && (
                   <tr>
