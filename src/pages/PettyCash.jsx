@@ -11,6 +11,7 @@ const PettyCash = () => {
     type: 'expense',
     amount: '',
     category: '雜支',
+    accountingItem: '雜費',
     description: '',
     payee: ''
   });
@@ -22,16 +23,18 @@ const PettyCash = () => {
       amount: Number(formData.amount)
     });
     setIsModalOpen(false);
-    setFormData({ type: 'expense', amount: '', category: '雜支', description: '', payee: '' });
+    setFormData({ type: 'expense', amount: '', category: '雜支', accountingItem: '雜費', description: '', payee: '' });
   };
 
   const filtered = transactions.filter(t => 
     (t.description || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
     (t.payee || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (t.category || '').toLowerCase().includes(searchTerm.toLowerCase())
+    (t.category || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (t.accounting_item || '').toLowerCase().includes(searchTerm.toLowerCase())
   ).sort((a, b) => new Date(b.date) - new Date(a.date));
 
   const categories = ['雜支', '交通', '餐費', '撥補', '辦公用品', '其他'];
+  const accountingItems = ['雜費', '郵電費', '修繕費', '差旅費', '交際費', '水電費', '其他'];
 
   return (
     <div className="petty-cash-page">
@@ -69,7 +72,7 @@ const PettyCash = () => {
               <Search size={18} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
               <input
                 type="text"
-                placeholder="搜尋摘要、對象或類別..."
+                placeholder="搜尋摘要、對象、類別或會計科目..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 style={{
@@ -90,10 +93,10 @@ const PettyCash = () => {
                 <thead>
                   <tr>
                     <th>日期</th>
-                    <th>類型</th>
                     <th>摘要</th>
+                    <th>會計科目</th>
                     <th>類別</th>
-                    <th>經手人/對象</th>
+                    <th>對象</th>
                     <th style={{ textAlign: 'right' }}>金額 (NT$)</th>
                     <th style={{ textAlign: 'center' }}>操作</th>
                   </tr>
@@ -102,20 +105,15 @@ const PettyCash = () => {
                   {filtered.map(t => (
                     <tr key={t.id}>
                       <td style={{ fontSize: '0.875rem' }}>{new Date(t.date).toLocaleDateString()}</td>
-                      <td>
-                        <span style={{ 
-                          display: 'flex', 
-                          alignItems: 'center', 
-                          gap: '0.25rem', 
-                          fontSize: '0.75rem', 
-                          fontWeight: 600,
-                          color: t.type === 'income' ? 'var(--success)' : 'var(--danger)'
-                        }}>
-                          {t.type === 'income' ? <ArrowUpCircle size={14} /> : <ArrowDownCircle size={14} />}
-                          {t.type === 'income' ? '撥補' : '支出'}
-                        </span>
+                      <td style={{ fontWeight: 500 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <span style={{ color: t.type === 'income' ? 'var(--success)' : 'var(--danger)' }}>
+                            {t.type === 'income' ? <ArrowUpCircle size={14} /> : <ArrowDownCircle size={14} />}
+                          </span>
+                          {t.description}
+                        </div>
                       </td>
-                      <td style={{ fontWeight: 500 }}>{t.description}</td>
+                      <td><span style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>{t.accounting_item || '-'}</span></td>
                       <td><span className="badge">{t.category}</span></td>
                       <td>{t.payee}</td>
                       <td style={{ 
@@ -173,6 +171,16 @@ const PettyCash = () => {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
             <div className="flex flex-col gap-2">
+              <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>會計科目</label>
+              <select 
+                value={formData.accountingItem} 
+                onChange={(e) => setFormData({ ...formData, accountingItem: e.target.value })}
+                style={{ padding: '0.625rem', border: '1px solid var(--border)', borderRadius: '0.375rem', backgroundColor: 'transparent', color: 'inherit' }}
+              >
+                {accountingItems.map(item => <option key={item} value={item}>{item}</option>)}
+              </select>
+            </div>
+            <div className="flex flex-col gap-2">
               <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>類別</label>
               <select 
                 value={formData.category} 
@@ -182,16 +190,16 @@ const PettyCash = () => {
                 {categories.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
-            <div className="flex flex-col gap-2">
-              <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>經手人/對象</label>
-              <input 
-                required 
-                type="text" 
-                value={formData.payee} 
-                onChange={(e) => setFormData({ ...formData, payee: e.target.value })} 
-                style={{ padding: '0.625rem', border: '1px solid var(--border)', borderRadius: '0.375rem', backgroundColor: 'transparent', color: 'inherit' }} 
-              />
-            </div>
+          </div>
+          <div className="flex flex-col gap-2">
+            <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>經手人/對象</label>
+            <input 
+              required 
+              type="text" 
+              value={formData.payee} 
+              onChange={(e) => setFormData({ ...formData, payee: e.target.value })} 
+              style={{ padding: '0.625rem', border: '1px solid var(--border)', borderRadius: '0.375rem', backgroundColor: 'transparent', color: 'inherit' }} 
+            />
           </div>
           <div className="flex flex-col gap-2">
             <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>摘要/備註</label>
@@ -199,7 +207,7 @@ const PettyCash = () => {
               required 
               value={formData.description} 
               onChange={(e) => setFormData({ ...formData, description: e.target.value })} 
-              rows="3"
+              rows="2"
               style={{ padding: '0.625rem', border: '1px solid var(--border)', borderRadius: '0.375rem', backgroundColor: 'transparent', color: 'inherit', resize: 'none' }} 
             />
           </div>
