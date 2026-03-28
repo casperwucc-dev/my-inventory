@@ -175,35 +175,37 @@ const PettyCash = () => {
               />
             </div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-            <div className="flex flex-col gap-2">
-              <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>會計科目</label>
-              <select 
-                value={formData.accountingItem} 
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setFormData({ 
-                    ...formData, 
-                    accountingItem: val,
-                    category: ACCOUNTING_MAP[val]?.[0] || '其他'
-                  });
-                }}
-                style={{ padding: '0.625rem', border: '1px solid var(--border)', borderRadius: '0.375rem', backgroundColor: 'transparent', color: 'inherit' }}
-              >
-                {accountingItems.map(item => <option key={item} value={item}>{item}</option>)}
-              </select>
+          {formData.type === 'expense' && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div className="flex flex-col gap-2">
+                <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>會計科目</label>
+                <select 
+                  value={formData.accountingItem} 
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setFormData({ 
+                      ...formData, 
+                      accountingItem: val,
+                      category: ACCOUNTING_MAP[val]?.[0] || '其他'
+                    });
+                  }}
+                  style={{ padding: '0.625rem', border: '1px solid var(--border)', borderRadius: '0.375rem', backgroundColor: 'transparent', color: 'inherit' }}
+                >
+                  {accountingItems.map(item => <option key={item} value={item}>{item}</option>)}
+                </select>
+              </div>
+              <div className="flex flex-col gap-2">
+                <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>類別</label>
+                <select 
+                  value={formData.category} 
+                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                  style={{ padding: '0.625rem', border: '1px solid var(--border)', borderRadius: '0.375rem', backgroundColor: 'transparent', color: 'inherit' }}
+                >
+                  {currentCategories.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
             </div>
-            <div className="flex flex-col gap-2">
-              <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>類別</label>
-              <select 
-                value={formData.category} 
-                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                style={{ padding: '0.625rem', border: '1px solid var(--border)', borderRadius: '0.375rem', backgroundColor: 'transparent', color: 'inherit' }}
-              >
-                {currentCategories.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </div>
-          </div>
+          )}
           <div className="flex flex-col gap-2">
             <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>摘要/備註</label>
             <textarea 
