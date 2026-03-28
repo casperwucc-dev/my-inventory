@@ -155,6 +155,142 @@ export const useInventory = () => {
     fetchInventoryData();
   };
 
+  const updateSale = async (id, updatedSale) => {
+    const originalSale = sales.find(s => s.id === id);
+    if (!originalSale) return;
+
+    const { error: updateError } = await supabase
+      .from('sales')
+      .update({
+        product_id: updatedSale.productId,
+        customer_id: updatedSale.customerId,
+        quantity: updatedSale.quantity,
+        unit_price: updatedSale.unitPrice,
+        total_amount: updatedSale.totalAmount
+      })
+      .eq('id', id);
+    handleError(updateError, 'Error updating sale');
+
+    // Handle stock adjustment
+    if (originalSale.product_id === updatedSale.productId) {
+      // Same product, adjust quantity difference
+      const product = products.find(p => p.id === updatedSale.productId);
+      const diff = updatedSale.quantity - originalSale.quantity;
+      const { error: stockError } = await supabase
+        .from('products')
+        .update({ stock: product.stock - diff })
+        .eq('id', updatedSale.productId);
+      handleError(stockError, 'Error updating stock');
+    } else {
+      // Different product, restore old and subtract new
+      const oldProduct = products.find(p => p.id === originalSale.product_id);
+      const newProduct = products.find(p => p.id === updatedSale.productId);
+      
+      if (oldProduct) {
+        await supabase.from('products').update({ stock: oldProduct.stock + originalSale.quantity }).eq('id', originalSale.product_id);
+      }
+      if (newProduct) {
+        await supabase.from('products').update({ stock: newProduct.stock - updatedSale.quantity }).eq('id', updatedSale.productId);
+      }
+    }
+
+    fetchInventoryData();
+  };
+
+  const deleteSale = async (id) => {
+    const saleToDelete = sales.find(s => s.id === id);
+    if (!saleToDelete) return;
+
+    const { error: deleteError } = await supabase
+      .from('sales')
+      .delete()
+      .eq('id', id);
+    handleError(deleteError, 'Error deleting sale');
+
+    const product = products.find(p => p.id === saleToDelete.product_id);
+    if (product) {
+      const { error: stockError } = await supabase
+        .from('products')
+        .update({ stock: product.stock + saleToDelete.quantity })
+        .eq('id', saleToDelete.product_id);
+      handleError(stockError, 'Error updating stock');
+    }
+
+    fetchInventoryData();
+  };
+
+  const updatePurchase = async (id, updatedPurchase) => {
+    const original = purchases.find(p => p.id === id);
+    if (!original) return;
+
+    // Update purchase record
+    const { error: updateError } = await supabase
+      .from('purchases')
+      .update({
+        product_id: updatedPurchase.productId,
+        supplier_id: updatedPurchase.supplierId,
+        quantity: updatedPurchase.quantity,
+        unit_price: updatedPurchase.unitPrice,
+        total_amount: updatedPurchase.totalAmount
+      })
+      .eq('id', id);
+    handleError(updateError, 'Error updating purchase');
+
+    // Handle stock adjustment
+    if (original.product_id === updatedPurchase.productId) {
+      // Same product, adjust quantity difference
+      const product = products.find(p => p.id === updatedPurchase.productId);
+      const rate = product?.conversion_rate || 1;
+      const diffBase = (updatedPurchase.quantity - original.quantity) * rate;
+      
+      const { error: stockError } = await supabase
+        .from('products')
+        .update({ stock: product.stock + diffBase })
+        .eq('id', updatedPurchase.productId);
+      handleError(stockError, 'Error updating stock');
+    } else {
+      // Different product, restore old and subtract new
+      const oldP = products.find(p => p.id === original.product_id);
+      const newP = products.find(p => p.id === updatedPurchase.productId);
+      
+      if (oldP) {
+        const oldRemovedQty = original.quantity * (oldP.conversion_rate || 1);
+        await supabase.from('products').update({ stock: oldP.stock - oldRemovedQty }).eq('id', original.product_id);
+      }
+      if (newP) {
+        const newAddedQty = updatedPurchase.quantity * (newP.conversion_rate || 1);
+        await supabase.from('products').update({ stock: newP.stock + newAddedQty }).eq('id', updatedPurchase.productId);
+      }
+    }
+
+    fetchInventoryData();
+  };
+
+  const deletePurchase = async (id) => {
+    const pToDelete = purchases.find(p => p.id === id);
+    if (!pToDelete) return;
+
+    // Remove from purchases
+    const { error: deleteError } = await supabase
+      .from('purchases')
+      .delete()
+      .eq('id', id);
+    handleError(deleteError, 'Error deleting purchase');
+
+    // Restore stock (subtract the quantity added)
+    const product = products.find(p => p.id === pToDelete.product_id);
+    if (product) {
+      const removedQty = pToDelete.quantity * (product.conversion_rate || 1);
+      const { error: stockError } = await supabase
+        .from('products')
+        .update({ stock: product.stock - removedQty })
+        .eq('id', pToDelete.product_id);
+      handleError(stockError, 'Error updating stock');
+    }
+
+    fetchInventoryData();
+  };
+
   return {
     products,
     purchases,
@@ -165,6 +301,10 @@ export const useInventory = () => {
     deleteProduct,
     recordPurchase,
     recordSale,
+    updateSale,
+    deleteSale,
+    updatePurchase,
+    deletePurchase,
     refreshInventory: fetchInventoryData
   };
 };

@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { useInventory, useSuppliers } from '../hooks/useInventory';
-import { Plus, ShoppingCart, Search, Calendar, Loader2 } from 'lucide-react';
+import { Plus, ShoppingCart, Search, Calendar, Loader2, Edit2, Trash2 } from 'lucide-react';
 import Modal from '../components/Common/Modal';
 
 const Purchases = () => {
-  const { products, purchases, recordPurchase, loading: inventoryLoading } = useInventory();
+  const { products, purchases, recordPurchase, updatePurchase, deletePurchase, loading: inventoryLoading } = useInventory();
   const { suppliers, loading: suppliersLoading } = useSuppliers();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editingPurchase, setEditingPurchase] = useState(null);
   const [formData, setFormData] = useState({
     productId: '',
     quantity: 1,
@@ -16,15 +18,47 @@ const Purchases = () => {
 
   const loading = inventoryLoading || suppliersLoading;
 
+  const handleOpenAddModal = () => {
+    setIsEditMode(false);
+    setEditingPurchase(null);
+    setFormData({ productId: '', quantity: 1, supplierId: '', cost: 0 });
+    setIsModalOpen(true);
+  };
+
+  const handleOpenEditModal = (purchase) => {
+    setIsEditMode(true);
+    setEditingPurchase(purchase);
+    setFormData({
+      productId: purchase.product_id,
+      quantity: purchase.quantity,
+      supplierId: purchase.supplier_id,
+      cost: purchase.total_amount
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleDelete = async (id) => {
+    if (window.confirm('確定要刪除這筆進貨紀錄嗎？這將會從庫存中扣除相應數量。')) {
+      await deletePurchase(id);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    await recordPurchase({
+    const purchaseData = {
       productId: formData.productId,
       supplierId: formData.supplierId,
       quantity: formData.quantity,
       unitPrice: formData.cost / formData.quantity,
       totalAmount: formData.cost
-    });
+    };
+
+    if (isEditMode) {
+      await updatePurchase(editingPurchase.id, purchaseData);
+    } else {
+      await recordPurchase(purchaseData);
+    }
+    
     setIsModalOpen(false);
     setFormData({ productId: '', quantity: 1, supplierId: '', cost: 0 });
   };
@@ -36,7 +70,7 @@ const Purchases = () => {
           <h1 style={{ fontSize: '1.875rem', fontWeight: 'bold' }}>進貨管理</h1>
           <p style={{ color: 'var(--text-muted)' }}>記錄每一筆進貨明細並自動更新庫存。</p>
         </div>
-        <button className="btn btn-primary" onClick={() => setIsModalOpen(true)}>
+        <button className="btn btn-primary" onClick={handleOpenAddModal}>
           <Plus size={20} />
           記錄新進貨
         </button>
@@ -59,6 +93,7 @@ const Purchases = () => {
                   <th>數量</th>
                   <th>總成本 (NT$)</th>
                   <th>進貨日期</th>
+                  <th style={{ textAlign: 'center' }}>操作</th>
                 </tr>
               </thead>
               <tbody>
@@ -71,12 +106,32 @@ const Purchases = () => {
                       <td>{p.quantity}</td>
                       <td>{p.total_amount?.toLocaleString()}</td>
                       <td>{new Date(p.date).toLocaleString()}</td>
+                      <td>
+                        <div className="flex justify-center gap-2">
+                          <button 
+                            className="btn btn-ghost btn-sm" 
+                            style={{ padding: '0.25rem' }} 
+                            onClick={() => handleOpenEditModal(p)}
+                            title="編輯"
+                          >
+                            <Edit2 size={16} className="text-primary" />
+                          </button>
+                          <button 
+                            className="btn btn-ghost btn-sm" 
+                            style={{ padding: '0.25rem' }} 
+                            onClick={() => handleDelete(p.id)}
+                            title="刪除"
+                          >
+                            <Trash2 size={16} style={{ color: '#ef4444' }} />
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   );
                 })}
                 {purchases.length === 0 && (
                   <tr>
-                    <td colSpan="6" style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '3rem' }}>尚未有進貨紀錄</td>
+                    <td colSpan="7" style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '3rem' }}>尚未有進貨紀錄</td>
                   </tr>
                 )}
               </tbody>
@@ -88,7 +143,7 @@ const Purchases = () => {
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title="記錄新進貨"
+        title={isEditMode ? "編輯進貨紀錄" : "記錄新進貨"}
       >
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           <div className="flex flex-col gap-2">
@@ -147,7 +202,7 @@ const Purchases = () => {
           </div>
           <div style={{ marginTop: '0.5rem', display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
             <button type="button" className="btn btn-ghost" onClick={() => setIsModalOpen(false)}>取消</button>
-            <button type="submit" className="btn btn-primary">確認入庫</button>
+            <button type="submit" className="btn btn-primary">{isEditMode ? "儲存修改" : "確認入庫"}</button>
           </div>
         </form>
       </Modal>

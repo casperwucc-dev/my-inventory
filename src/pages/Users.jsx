@@ -86,7 +86,17 @@ const Users = () => {
             body: { userId: editingUser.id, newPassword: formData.password }
           });
           
-          if (functionError) throw functionError;
+          if (functionError) {
+            // Try to extract JSON error message if available
+            let detailedError = functionError.message;
+            try {
+              if (functionError.context && typeof functionError.context.json === 'function') {
+                const errorData = await functionError.context.json();
+                if (errorData.error) detailedError = errorData.error;
+              }
+            } catch (e) {}
+            throw new Error(detailedError);
+          }
         }
       }
       setIsModalOpen(false);
