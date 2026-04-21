@@ -64,6 +64,8 @@ CREATE TABLE IF NOT EXISTS petty_cash (
   category TEXT,
   payee TEXT,
   description TEXT,
+  status TEXT DEFAULT 'pending',
+  replenishment_id UUID REFERENCES petty_cash(id) ON DELETE SET NULL,
   date TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
@@ -124,5 +126,18 @@ CREATE TRIGGER on_auth_user_created
 
 -- Seed existing users into profiles
 INSERT INTO public.profiles (id, email, role)
-SELECT id, email, 'admin' FROM auth.users
-ON CONFLICT (id) DO NOTHING;
+-- 8. Main Ledger Table
+CREATE TABLE IF NOT EXISTS main_ledger (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  date TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+  type TEXT CHECK (type IN ('income', 'expense')) NOT NULL,
+  amount NUMERIC NOT NULL,
+  category TEXT,
+  description TEXT,
+  source_type TEXT, -- 'sale', 'purchase', 'petty_cash', 'manual'
+  source_id UUID,   -- Reference to original record's ID
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+ALTER TABLE main_ledger DISABLE ROW LEVEL SECURITY;
+

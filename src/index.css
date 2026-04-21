@@ -173,3 +173,100 @@ tr:last-child td {
 tr:hover td {
   background-color: var(--bg-main);
 }
+
+/* Print Styles - Robust Layout Reset */
+@media print {
+  /* HIDE these elements */
+  .sidebar, 
+  .no-print, 
+  .btn, 
+  .btn-ghost, 
+  .search-bar, 
+  header, 
+  .selection-summary-bar,
+  .is-voucher-open .hide-during-voucher {
+    display: none !important;
+  }
+
+  /* RESET Main Layout */
+  .app-container {
+    display: block !important;
+  }
+
+  main {
+    padding: 0 !important;
+    margin: 0 !important;
+    background: white !important;
+    overflow: visible !important;
+  }
+
+  /* RESET Modal Containers (The Overlay) */
+  div[style*="position: fixed"] {
+    position: static !important;
+    display: block !important;
+    background: transparent !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    width: 100% !important;
+    height: auto !important;
+  }
+
+  /* RESET Modal Card (The Content Box) */
+  .card {
+    max-width: none !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    position: static !important;
+    overflow: visible !important;
+    max-height: none !important;
+  }
+
+  /* Target specific elements inside the card */
+  .card h2, .card header, button[style*="padding: 0.25rem"] {
+    display: none !important;
+  }
+
+  /* Form & Table Formatting */
+  #voucher-to-print {
+    background: white !important;
+    color: black !important;
+    width: 100% !important;
+  }
+
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    border: 1px solid #000 !important;
+  }
+
+  th, td {
+    border: 1px solid #000 !important;
+    color: black !important;
+  }
+
+  /* Page Break Logic */
+  .page-break {
+    break-before: page !important;
+    page-break-before: always !important;
+    margin-top: 5rem !important;
+    display: block !important;
+  }
+
+  @page {
+    margin: 1.5cm;
+    size: A4;
+  }
+}
+
+/* Selection Summary Bar */
+.selection-summary-bar {
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from { transform: translateY(-10px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}

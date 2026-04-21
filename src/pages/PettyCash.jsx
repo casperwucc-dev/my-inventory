@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { usePettyCash, usePettyCashCategories } from '../hooks/useInventory';
-import { Plus, Trash2, Wallet, ArrowUpCircle, ArrowDownCircle, Search, Calendar, User, Loader2, Settings, X, ChevronDown, ChevronRight } from 'lucide-react';
+import { Plus, Trash2, Wallet, ArrowUpCircle, ArrowDownCircle, Search, Calendar, User, Loader2, Settings, X, ChevronDown, ChevronRight, Printer, CheckSquare, Square, FileText, Pencil } from 'lucide-react';
 import Modal from '../components/Common/Modal';
 
 const PettyCash = () => {
-  const { transactions, balance, addTransaction, deleteTransaction, loading: transLoading } = usePettyCash();
+  const { transactions, balance, addTransaction, deleteTransaction, updateTransactionStatus, updateTransaction, createReplenishment, loading: transLoading } = usePettyCash();
   const { categories: dbCategories, addCategory, deleteCategory, loading: catLoading } = usePettyCashCategories();
   
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -21,9 +21,20 @@ const PettyCash = () => {
   // Category Management State
   const [newCat, setNewCat] = useState({ accountingItem: '', category: '' });
   const [expandedAccounts, setExpandedAccounts] = useState({});
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [isVoucherOpen, setIsVoucherOpen] = useState(false);
+  const [currentVoucher, setCurrentVoucher] = useState(null);
+  const [editingTransaction, setEditingTransaction] = useState(null);
+  const [expandedReplenishmentIds, setExpandedReplenishmentIds] = useState([]);
 
   const toggleAccount = (act) => {
     setExpandedAccounts(prev => ({...prev, [act]: !prev[act]}));
+  };
+
+  const toggleReplenishment = (id) => {
+    setExpandedReplenishmentIds(prev => 
+      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+    );
   };
 
   const categorizedForSettings = dbCategories.reduce((acc, cat) => {
@@ -54,11 +65,35 @@ const PettyCash = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    await addTransaction({
-      ...formData,
-      amount: Number(formData.amount)
+    if (editingTransaction) {
+      await updateTransaction(editingTransaction.id, {
+        ...formData,
+        amount: Number(formData.amount)
+      });
+    } else {
+      await addTransaction({
+        ...formData,
+        amount: Number(formData.amount)
+      });
+    }
+    closeModal();
+  };
+
+  const handleEdit = (t) => {
+    setEditingTransaction(t);
+    setFormData({
+      type: t.type,
+      amount: t.amount,
+      accountingItem: t.accounting_item || '',
+      category: t.category || '',
+      description: t.description || ''
     });
+    setIsModalOpen(true);
+  };
+
+  const closeModal = () => {
     setIsModalOpen(false);
+    setEditingTransaction(null);
     setFormData({ 
       type: 'expense', 
       amount: '', 
@@ -81,10 +116,68 @@ const PettyCash = () => {
     (t.accounting_item || '').toLowerCase().includes(searchTerm.toLowerCase())
   ).sort((a, b) => new Date(b.date) - new Date(a.date));
 
+  const selectable = filtered.filter(t => t.type === 'expense' && t.status !== 'applied');
+  
+  const handleSelectAll = () => {
+    const selectable = filtered.filter(t => t.type === 'expense' && t.status !== 'applied');
+    if (selectedIds.length === selectable.length && selectable.length > 0) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(selectable.map(t => t.id));
+    }
+  };
+
+  const handleSelectRow = (t) => {
+    if (t.type !== 'expense' || t.status === 'applied') return;
+    const id = t.id;
+    setSelectedIds(prev => 
+      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+    );
+  };
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const selectedTotal = transactions
+    .filter(t => selectedIds.includes(t.id))
+    .reduce((sum, t) => sum + Number(t.amount), 0);
+
+  const selectedItems = transactions.filter(t => selectedIds.includes(t.id));
+
+  const handleApply = (transaction = null) => {
+    if (transaction) {
+      setCurrentVoucher(transaction);
+    } else if (selectedIds.length > 0) {
+      setCurrentVoucher(null);
+    } else {
+      setCurrentVoucher(null);
+    }
+    setIsVoucherOpen(true);
+  };
+
+  const handleConfirmApplication = async () => {
+    try {
+      if (selectedIds.length === 0 && !currentVoucher) return;
+      
+      const idsToUpdate = currentVoucher ? [currentVoucher.id] : selectedIds;
+      const totalAmount = currentVoucher ? Number(currentVoucher.amount) : selectedTotal;
+      const desc = currentVoucher ? `零用金撥補: ${currentVoucher.description}` : `零用金報銷撥補 (共 ${selectedIds.length} 筆)`;
+
+      await createReplenishment(idsToUpdate, totalAmount, desc);
+      
+      setIsVoucherOpen(false);
+      setSelectedIds([]);
+      setCurrentVoucher(null);
+    } catch (error) {
+      console.error('Failed to confirm application:', error);
+    }
+  };
+
   const currentCategories = ACCOUNTING_MAP[formData.accountingItem] || [];
 
   return (
-    <div className="petty-cash-page">
+    <div className={`petty-cash-page ${isVoucherOpen ? 'is-voucher-open' : ''}`}>
       <header className="flex justify-between items-center m-b-6">
         <div>
           <h1 style={{ fontSize: '1.875rem', fontWeight: 'bold' }}>零用金管理</h1>
@@ -100,7 +193,15 @@ const PettyCash = () => {
               </span>
             </div>
           </div>
-          <button className="btn btn-primary" onClick={() => setIsModalOpen(true)}>
+          <button className="btn btn-ghost no-print" onClick={handlePrint} title="列印報表">
+            <Printer size={20} />
+            列印
+          </button>
+          <button className="btn btn-ghost no-print" onClick={() => handleApply()} title="申請零用金">
+            <FileText size={20} />
+            申請
+          </button>
+          <button className="btn btn-primary no-print" onClick={() => { setEditingTransaction(null); setIsModalOpen(true); }}>
             <Plus size={20} />
             新增紀錄
           </button>
@@ -114,7 +215,7 @@ const PettyCash = () => {
         </div>
       ) : (
         <>
-          <div className="card m-b-6">
+          <div className="card no-print m-b-6 hide-during-voucher">
             <div style={{ position: 'relative' }}>
               <Search size={18} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
               <input
@@ -134,47 +235,158 @@ const PettyCash = () => {
             </div>
           </div>
 
-          <div className="card">
+          {selectedIds.length > 0 && (
+            <div className="card no-print m-b-6" style={{ 
+              backgroundColor: 'var(--primary)', 
+              color: 'white', 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center',
+              padding: '1rem 1.5rem'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <CheckSquare size={24} />
+                <span style={{ fontWeight: 600 }}>
+                  已選取 {selectedIds.length} 筆資料
+                </span>
+                <span style={{ opacity: 0.8 }}>|</span>
+                <span style={{ fontWeight: 'bold', fontSize: '1.1rem' }}>
+                  合計金額：NT$ {selectedTotal.toLocaleString()}
+                </span>
+              </div>
+              <div style={{ display: 'flex', gap: '0.75rem' }}>
+                <button className="btn" style={{ backgroundColor: 'white', color: 'var(--primary)' }} onClick={() => handleApply()}>
+                  批次申請傳票
+                </button>
+                <button className="btn-ghost" style={{ color: 'white' }} onClick={() => setSelectedIds([])}>
+                  取消選取
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="card no-print hide-during-voucher">
             <div className="table-container">
               <table>
                 <thead>
                   <tr>
+                    <th className="no-print" style={{ width: '40px', textAlign: 'center' }}>
+                      <button className="btn-ghost" onClick={handleSelectAll} style={{ padding: 0 }} disabled={selectable.length === 0}>
+                        {selectedIds.length === selectable.length && selectable.length > 0 ? 
+                          <CheckSquare size={18} color="var(--primary)" /> : 
+                          <Square size={18} />
+                        }
+                      </button>
+                    </th>
                     <th>日期</th>
                     <th>摘要</th>
                     <th>會計科目</th>
                     <th>類別</th>
                     <th style={{ textAlign: 'right' }}>金額 (NT$)</th>
-                    <th style={{ textAlign: 'center' }}>操作</th>
+                    <th style={{ textAlign: 'right' }}>餘額 (NT$)</th>
+                    <th style={{ textAlign: 'center' }} className="no-print">操作</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map(t => (
-                    <tr key={t.id}>
-                      <td style={{ fontSize: '0.875rem' }}>{new Date(t.date).toLocaleDateString()}</td>
-                      <td style={{ fontWeight: 500 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <span style={{ color: t.type === 'income' ? 'var(--success)' : 'var(--danger)' }}>
-                            {t.type === 'income' ? <ArrowUpCircle size={14} /> : <ArrowDownCircle size={14} />}
-                          </span>
-                          {t.description}
-                        </div>
-                      </td>
-                      <td><span style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>{t.accounting_item || '-'}</span></td>
-                      <td><span className="badge">{t.category}</span></td>
-                      <td style={{ 
-                        textAlign: 'right', 
-                        fontWeight: 'bold',
-                        color: t.type === 'income' ? 'var(--success)' : 'inherit'
-                      }}>
-                        {t.type === 'income' ? '+' : '-'}{t.amount.toLocaleString()}
-                      </td>
-                      <td style={{ textAlign: 'center' }}>
-                        <button className="btn-ghost" style={{ color: 'var(--danger)' }} onClick={() => deleteTransaction(t.id)}>
-                          <Trash2 size={16} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                  {filtered.map(t => {
+                    const isExpanded = expandedReplenishmentIds.includes(t.id);
+                    const linkedExpenses = transactions.filter(e => e.replenishment_id === t.id);
+                    const hasDetails = t.type === 'income' && t.category === '零用金撥補' && linkedExpenses.length > 0;
+
+                    return (
+                      <React.Fragment key={t.id}>
+                        <tr style={{ 
+                          backgroundColor: t.status === 'applied' ? 'rgba(0, 0, 0, 0.04)' : (selectedIds.includes(t.id) ? 'rgba(99, 102, 241, 0.05)' : 'transparent'),
+                          opacity: t.status === 'applied' ? 0.7 : 1,
+                          borderLeft: hasDetails ? '4px solid var(--primary)' : 'none'
+                        }}>
+                          <td className="no-print" style={{ textAlign: 'center' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                              {hasDetails && (
+                                <button className="btn-ghost" onClick={() => toggleReplenishment(t.id)} style={{ padding: 0 }}>
+                                  {isExpanded ? <ChevronDown size={18} color="var(--primary)" /> : <ChevronRight size={18} />}
+                                </button>
+                              )}
+                              {t.type === 'expense' && t.status !== 'applied' ? (
+                                <button className="btn-ghost" onClick={() => handleSelectRow(t)} style={{ padding: 0 }}>
+                                  {selectedIds.includes(t.id) ? 
+                                    <CheckSquare size={18} color="var(--primary)" /> : 
+                                    <Square size={18} />
+                                  }
+                                </button>
+                              ) : (
+                                !hasDetails && <div style={{ width: '18px', height: '18px' }}></div>
+                              )}
+                            </div>
+                          </td>
+                          <td style={{ fontSize: '0.875rem' }}>{new Date(t.date).toLocaleDateString()}</td>
+                          <td style={{ fontWeight: 500, cursor: 'pointer' }} onClick={() => hasDetails ? toggleReplenishment(t.id) : handleApply(t)}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                              <span style={{ color: t.type === 'income' ? 'var(--success)' : 'var(--danger)' }}>
+                                {t.type === 'income' ? <ArrowUpCircle size={14} /> : <ArrowDownCircle size={14} />}
+                              </span>
+                              {t.description}
+                              {hasDetails && <span style={{ fontSize: '0.75rem', color: 'var(--primary)', fontWeight: 'normal' }}> (查看明細)</span>}
+                            </div>
+                          </td>
+                          <td><span style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>{t.accounting_item || '-'}</span></td>
+                          <td><span className="badge">{t.category}</span></td>
+                          <td style={{ 
+                            textAlign: 'right', 
+                            fontWeight: 'bold',
+                            color: t.type === 'income' ? 'var(--success)' : 'inherit'
+                          }}>
+                            {t.type === 'income' ? '+' : '-'}{t.amount.toLocaleString()}
+                          </td>
+                          <td style={{ textAlign: 'right', fontWeight: 600, color: (t.running_balance || 0) >= 0 ? 'inherit' : 'var(--danger)' }}>
+                            {t.running_balance?.toLocaleString()}
+                          </td>
+                          <td style={{ textAlign: 'center' }} className="no-print">
+                            <div style={{ display: 'flex', justifyContent: 'center', gap: '0.25rem' }}>
+                              <button className="btn-ghost" style={{ color: 'var(--primary)', padding: '4px' }} onClick={() => handleApply(t)} title="查看傳票">
+                                <FileText size={16} />
+                              </button>
+                              <button className="btn-ghost" style={{ color: 'var(--primary)', padding: '4px' }} onClick={() => handleEdit(t)} title="修改紀錄">
+                                <Pencil size={16} />
+                              </button>
+                              <button className="btn-ghost" style={{ color: 'var(--danger)', padding: '4px' }} onClick={() => deleteTransaction(t.id)}>
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                        {isExpanded && hasDetails && (
+                          <tr className="no-print" style={{ backgroundColor: 'rgba(59, 130, 246, 0.03)' }}>
+                            <td colSpan="8" style={{ padding: '0 0 1rem 3rem' }}>
+                              <div style={{ borderLeft: '2px solid var(--primary-light)', paddingLeft: '1rem' }}>
+                                <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--primary)', marginBottom: '0.5rem' }}>撥補花費明細：</div>
+                                <table style={{ width: '100%', fontSize: '0.8rem' }}>
+                                  <thead>
+                                    <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                                      <th style={{ textAlign: 'left', padding: '0.25rem' }}>日期</th>
+                                      <th style={{ textAlign: 'left', padding: '0.25rem' }}>摘要</th>
+                                      <th style={{ textAlign: 'left', padding: '0.25rem' }}>類別</th>
+                                      <th style={{ textAlign: 'right', padding: '0.25rem' }}>金額</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {linkedExpenses.map(item => (
+                                      <tr key={item.id}>
+                                        <td style={{ padding: '0.25rem' }}>{new Date(item.date).toLocaleDateString()}</td>
+                                        <td style={{ padding: '0.25rem' }}>{item.description}</td>
+                                        <td style={{ padding: '0.25rem' }}>{item.category}</td>
+                                        <td style={{ textAlign: 'right', padding: '0.25rem' }}>{Number(item.amount).toLocaleString()}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
                   {filtered.length === 0 && (
                     <tr>
                       <td colSpan="6" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
@@ -190,7 +402,7 @@ const PettyCash = () => {
       )}
 
       {/* Main Entry Modal */}
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="新增零用金紀錄">
+      <Modal isOpen={isModalOpen} onClose={closeModal} title={editingTransaction ? "修改零用金紀錄" : "新增零用金紀錄"}>
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
             <div className="flex flex-col gap-2">
@@ -266,8 +478,8 @@ const PettyCash = () => {
             />
           </div>
           <div style={{ marginTop: '0.5rem', display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
-            <button type="button" className="btn btn-ghost" onClick={() => setIsModalOpen(false)}>取消</button>
-            <button type="submit" className="btn btn-primary">確認新增</button>
+            <button type="button" className="btn btn-ghost" onClick={closeModal}>取消</button>
+            <button type="submit" className="btn btn-primary">{editingTransaction ? "確認修改" : "確認新增"}</button>
           </div>
         </form>
       </Modal>
@@ -351,6 +563,128 @@ const PettyCash = () => {
                 )}
               </tbody>
             </table>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Petty Cash Voucher (Application) Modal */}
+      <Modal isOpen={isVoucherOpen} onClose={() => setIsVoucherOpen(false)} title={currentVoucher || selectedIds.length > 0 ? (selectedIds.length > 1 ? "零用金撥報(彙總)" : "零用金支出傳票") : "零用金申請單"}>
+        <div id="voucher-to-print" style={{ padding: '0.5rem', backgroundColor: 'white', color: 'black' }}>
+          
+          {/* Section 1: The Voucher (Application Form) */}
+          <section className="print-section" style={{ marginBottom: '4rem' }}>
+            <div style={{ textAlign: 'center', marginBottom: '1.5rem', borderBottom: '2px solid black', paddingBottom: '0.5rem' }}>
+              <h2 style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>長和事業有限公司</h2>
+              <h3 style={{ fontSize: '1.25rem', letterSpacing: '0.5rem' }}>
+                {selectedIds.length > 1 ? '零用金支用彙總傳票' : (currentVoucher ? '零用金支出傳票' : '零用金申請單')}
+              </h3>
+            </div>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+              <div>日期：{currentVoucher ? new Date(currentVoucher.date).toLocaleDateString() : new Date().toLocaleDateString()}</div>
+              <div style={{ textAlign: 'right' }}>傳票號碼：{currentVoucher ? currentVoucher.id.slice(0, 8).toUpperCase() : (selectedIds.length > 1 ? 'BULK-' + new Date().getTime().toString().slice(-6) : 'NEW')}</div>
+            </div>
+
+            <table className="voucher-table" style={{ border: '1px solid black', width: '100%', borderCollapse: 'collapse' }}>
+              <tbody>
+                <tr>
+                  <td style={{ border: '1px solid black', padding: '12px', width: '100px', fontWeight: 'bold' }}>摘要</td>
+                  <td style={{ border: '1px solid black', padding: '12px' }} colSpan="3">
+                    {selectedIds.length > 1 ? `零用金報銷清單 (共 ${selectedIds.length} 筆資料)` : (currentVoucher?.description || '___________________')}
+                  </td>
+                </tr>
+                <tr>
+                  <td style={{ border: '1px solid black', padding: '12px', fontWeight: 'bold' }}>會計科目</td>
+                  <td style={{ border: '1px solid black', padding: '12px' }}>
+                    {selectedIds.length > 1 ? '雜費/各項支出' : (currentVoucher?.accounting_item || '___________________')}
+                  </td>
+                  <td style={{ border: '1px solid black', padding: '12px', fontWeight: 'bold' }}>類別</td>
+                  <td style={{ border: '1px solid black', padding: '12px' }}>
+                    {selectedIds.length > 1 ? '彙總報銷' : (currentVoucher?.category || '___________________')}
+                  </td>
+                </tr>
+                <tr>
+                  <td style={{ border: '1px solid black', padding: '12px', fontWeight: 'bold' }}>總計金額</td>
+                  <td style={{ border: '1px solid black', padding: '12px' }} colSpan="3">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>
+                        NT$ {(selectedIds.length > 1 ? selectedTotal : (currentVoucher?.amount || 0)).toLocaleString()}
+                      </span>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td style={{ border: '1px solid black', padding: '12px', fontWeight: 'bold' }}>受款人</td>
+                  <td style={{ border: '1px solid black', padding: '12px' }} colSpan="3">
+                    {currentVoucher?.payee || '___________________'}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '1rem', marginTop: '2.5rem', textAlign: 'center' }}>
+              <div style={{ borderTop: '1px solid black', paddingTop: '0.5rem' }}>核准人</div>
+              <div style={{ borderTop: '1px solid black', paddingTop: '0.5rem' }}>複核人</div>
+              <div style={{ borderTop: '1px solid black', paddingTop: '0.5rem' }}>經辦人</div>
+              <div style={{ borderTop: '1px solid black', paddingTop: '0.5rem' }}>領款人簽章</div>
+            </div>
+          </section>
+
+          {/* Section 2: Detailed List (Only shown for multiple items) */}
+          {selectedIds.length > 1 && (
+            <section className="print-section page-break" style={{ marginTop: '2rem' }}>
+              <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
+                <h3 style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>費用明細清單</h3>
+                <div style={{ fontSize: '0.875rem' }}>列印日期：{new Date().toLocaleString()}</div>
+              </div>
+              
+              <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #000' }}>
+                <thead>
+                  <tr style={{ backgroundColor: '#f3f4f6' }}>
+                    <th style={{ border: '1px solid #000', padding: '8px' }}>日期</th>
+                    <th style={{ border: '1px solid #000', padding: '8px' }}>摘要</th>
+                    <th style={{ border: '1px solid #000', padding: '8px' }}>會計科目</th>
+                    <th style={{ border: '1px solid #000', padding: '8px' }}>類別</th>
+                    <th style={{ border: '1px solid #000', padding: '8px', textAlign: 'right' }}>金額</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {selectedItems.map(item => (
+                    <tr key={item.id}>
+                      <td style={{ border: '1px solid #000', padding: '8px' }}>{new Date(item.date).toLocaleDateString()}</td>
+                      <td style={{ border: '1px solid #000', padding: '8px' }}>{item.description}</td>
+                      <td style={{ border: '1px solid #000', padding: '8px' }}>{item.accounting_item}</td>
+                      <td style={{ border: '1px solid #000', padding: '8px' }}>{item.category}</td>
+                      <td style={{ border: '1px solid #000', padding: '8px', textAlign: 'right' }}>
+                        {Number(item.amount).toLocaleString()}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr style={{ fontWeight: 'bold', backgroundColor: '#f3f4f6' }}>
+                    <td colSpan="4" style={{ border: '1px solid #000', padding: '8px', textAlign: 'right' }}>本頁合計 (共 {selectedIds.length} 筆)</td>
+                    <td style={{ border: '1px solid #000', padding: '8px', textAlign: 'right' }}>
+                      NT$ {selectedTotal.toLocaleString()}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </section>
+          )}
+          
+          <div className="no-print" style={{ marginTop: '2rem', display: 'flex', gap: '1rem', justifyContent: 'flex-end', borderTop: '1px solid #eee', paddingTop: '1.5rem' }}>
+            <button className="btn btn-ghost" onClick={() => setIsVoucherOpen(false)}>關閉視窗</button>
+            {(currentVoucher?.status !== 'applied' && (currentVoucher || selectedIds.length > 0)) && (
+              <button className="btn" style={{ backgroundColor: 'var(--success)', color: 'white' }} onClick={handleConfirmApplication}>
+                <CheckSquare size={18} />
+                確認並標記為已申請
+              </button>
+            )}
+            <button className="btn btn-primary" onClick={() => window.print()}>
+              <Printer size={18} />
+              立即列印
+            </button>
           </div>
         </div>
       </Modal>

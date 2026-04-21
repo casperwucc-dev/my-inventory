@@ -108,7 +108,7 @@ export const useInventory = () => {
   };
 
   const recordPurchase = async (purchase) => {
-    const { error: purchaseError } = await supabase
+    const { data: purchaseData, error: purchaseError } = await supabase
       .from('purchases')
       .insert([{
         product_id: purchase.productId,
@@ -116,8 +116,20 @@ export const useInventory = () => {
         quantity: purchase.quantity,
         unit_price: purchase.unitPrice,
         total_amount: purchase.totalAmount
-      }]);
+      }])
+      .select();
     handleError(purchaseError, 'Error recording purchase');
+
+    const purchaseId = purchaseData[0].id;
+    // Sync with main ledger
+    await supabase.from('main_ledger').insert([{
+      type: 'expense',
+      amount: purchase.totalAmount,
+      category: '進貨採購',
+      description: `採購: ${products.find(p => p.id === purchase.productId)?.name || '未知商品'}`,
+      source_type: 'purchase',
+      source_id: purchaseId
+    }]);
 
     // Update stock
     const product = products.find(p => p.id === purchase.productId);
@@ -133,7 +145,7 @@ export const useInventory = () => {
   };
 
   const recordSale = async (sale) => {
-    const { error: saleError } = await supabase
+    const { data: saleData, error: saleError } = await supabase
       .from('sales')
       .insert([{
         product_id: sale.productId,
@@ -141,8 +153,20 @@ export const useInventory = () => {
         quantity: sale.quantity,
         unit_price: sale.unitPrice,
         total_amount: sale.totalAmount
-      }]);
+      }])
+      .select();
     handleError(saleError, 'Error recording sale');
+
+    const saleId = saleData[0].id;
+    // Sync with main ledger
+    await supabase.from('main_ledger').insert([{
+      type: 'income',
+      amount: sale.totalAmount,
+      category: '銷售收入',
+      description: `銷售: ${products.find(p => p.id === sale.productId)?.name || '未知商品'}`,
+      source_type: 'sale',
+      source_id: saleId
+    }]);
 
     // Update stock
     const product = products.find(p => p.id === sale.productId);
@@ -170,6 +194,12 @@ export const useInventory = () => {
       })
       .eq('id', id);
     handleError(updateError, 'Error updating sale');
+
+    // Sync with main ledger
+    await supabase.from('main_ledger').update({
+      amount: updatedSale.totalAmount,
+      description: `銷售: ${products.find(p => p.id === updatedSale.productId)?.name || '未知商品'}`
+    }).eq('source_id', id);
 
     // Handle stock adjustment
     if (originalSale.product_id === updatedSale.productId) {
@@ -207,6 +237,9 @@ export const useInventory = () => {
       .eq('id', id);
     handleError(deleteError, 'Error deleting sale');
 
+    // Sync with main ledger
+    await supabase.from('main_ledger').delete().eq('source_id', id);
+
     const product = products.find(p => p.id === saleToDelete.product_id);
     if (product) {
       const { error: stockError } = await supabase
@@ -235,6 +268,12 @@ export const useInventory = () => {
       })
       .eq('id', id);
     handleError(updateError, 'Error updating purchase');
+
+    // Sync with main ledger
+    await supabase.from('main_ledger').update({
+      amount: updatedPurchase.totalAmount,
+      description: `採購: ${products.find(p => p.id === updatedPurchase.productId)?.name || '未知商品'}`
+    }).eq('source_id', id);
 
     // Handle stock adjustment
     if (original.product_id === updatedPurchase.productId) {
@@ -276,6 +315,9 @@ export const useInventory = () => {
       .delete()
       .eq('id', id);
     handleError(deleteError, 'Error deleting purchase');
+
+    // Sync with main ledger
+    await supabase.from('main_ledger').delete().eq('source_id', id);
 
     // Restore stock (subtract the quantity added)
     const product = products.find(p => p.id === pToDelete.product_id);
@@ -411,7 +453,8 @@ export const usePettyCash = () => {
       amount: transaction.amount,
       category: transaction.category,
       accounting_item: transaction.accountingItem,
-      description: transaction.description
+      description: transaction.description,
+      status: 'pending'
     }]);
     handleError(error, 'Error adding transaction');
     fetchTransactions();
@@ -423,11 +466,86 @@ export const usePettyCash = () => {
     fetchTransactions();
   };
 
+  const updateTransactionStatus = async (ids, status) => {
+    const { error } = await supabase
+      .from('petty_cash')
+      .update({ status })
+      .in('id', ids);
+    handleError(error, 'Error updating transaction status');
+    fetchTransactions();
+  };
+
+  const updateTransaction = async (id, transaction) => {
+    const { error } = await supabase
+      .from('petty_cash')
+      .update({
+        type: transaction.type,
+        amount: transaction.amount,
+        category: transaction.category,
+        accounting_item: transaction.accountingItem,
+        description: transaction.description
+      })
+      .eq('id', id);
+    handleError(error, 'Error updating transaction');
+    fetchTransactions();
+  };
+
+  const createReplenishment = async (expenseIds, amount, description) => {
+    // 1. Create the income record (Replenishment)
+    const { data: incomeData, error: incomeError } = await supabase
+      .from('petty_cash')
+      .insert([{
+        type: 'income',
+        amount: amount,
+        description: description,
+        status: 'pending',
+        category: '零用金撥補',
+        accounting_item: '現金撥補'
+      }])
+      .select();
+    
+    handleError(incomeError, 'Error creating replenishment income');
+    const incomeId = incomeData[0].id;
+
+    // 2. Link the expenses to this replenishment and mark as applied
+    const { error: patchError } = await supabase
+      .from('petty_cash')
+      .update({ 
+        status: 'applied',
+        replenishment_id: incomeId 
+      })
+      .in('id', expenseIds);
+    
+    handleError(patchError, 'Error linking expenses to replenishment');
+    
+    // Sync with main ledger (Create expense in main ledger for the fund movement)
+    await supabase.from('main_ledger').insert([{
+      type: 'expense',
+      amount: amount,
+      category: '零用金撥補',
+      description: description,
+      source_type: 'petty_cash',
+      source_id: incomeId
+    }]);
+
+    fetchTransactions();
+  };
+
+  const transactionsWithBalance = [...transactions]
+    .sort((a, b) => new Date(a.date) - new Date(b.date))
+    .reduce((acc, t) => {
+      const prevBal = acc.length > 0 ? acc[acc.length - 1].running_balance : 0;
+      const currBal = t.type === 'income' ? prevBal + Number(t.amount) : prevBal - Number(t.amount);
+      acc.push({ ...t, running_balance: currBal });
+      return acc;
+    }, [])
+    .sort((a, b) => new Date(b.date) - new Date(a.date));
+
   const balance = transactions.reduce((acc, t) => {
     return t.type === 'income' ? acc + Number(t.amount) : acc - Number(t.amount);
   }, 0);
 
-  return { transactions, balance, loading, addTransaction, deleteTransaction };
+  return { transactions: transactionsWithBalance, balance, loading, addTransaction, deleteTransaction, updateTransactionStatus, updateTransaction, createReplenishment };
 };
 
 export const usePettyCashCategories = () => {
@@ -466,4 +584,60 @@ export const usePettyCashCategories = () => {
   };
 
   return { categories, loading, addCategory, deleteCategory };
+};
+
+export const useMainLedger = () => {
+  const [entries, setEntries] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchLedger = async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('main_ledger')
+      .select('*')
+      .order('date', { ascending: false });
+    if (!error) setEntries(data);
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchLedger();
+  }, []);
+
+  const addEntry = async (entry) => {
+    const { error } = await supabase.from('main_ledger').insert([{
+      ...entry,
+      source_type: 'manual'
+    }]);
+    handleError(error, 'Error adding ledger entry');
+    fetchLedger();
+  };
+
+  const deleteEntry = async (id) => {
+    const { error } = await supabase.from('main_ledger').delete().eq('id', id);
+    handleError(error, 'Error deleting ledger entry');
+    fetchLedger();
+  };
+
+  const updateEntry = async (id, updated) => {
+    const { error } = await supabase.from('main_ledger').update(updated).eq('id', id);
+    handleError(error, 'Error updating ledger entry');
+    fetchLedger();
+  };
+
+  const balance = entries.reduce((acc, t) => {
+    return t.type === 'income' ? acc + Number(t.amount) : acc - Number(t.amount);
+  }, 0);
+
+  const ledgerWithBalance = [...entries]
+    .sort((a, b) => new Date(a.date) - new Date(b.date))
+    .reduce((acc, t) => {
+      const prevBal = acc.length > 0 ? acc[acc.length - 1].running_balance : 0;
+      const currBal = t.type === 'income' ? prevBal + Number(t.amount) : prevBal - Number(t.amount);
+      acc.push({ ...t, running_balance: currBal });
+      return acc;
+    }, [])
+    .sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  return { entries: ledgerWithBalance, balance, loading, addEntry, deleteEntry, updateEntry, refresh: fetchLedger };
 };

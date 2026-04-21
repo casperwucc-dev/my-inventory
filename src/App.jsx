@@ -8,6 +8,7 @@ import Sales from './pages/Sales';
 import Suppliers from './pages/Suppliers';
 import Customers from './pages/Customers';
 import PettyCash from './pages/PettyCash';
+import AccountLedger from './pages/AccountLedger';
 import Users from './pages/Users';
 import LoginPage from './pages/LoginPage';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -39,6 +40,7 @@ function AppContent() {
           <Route path="/suppliers" element={<ProtectedRoute><Suppliers /></ProtectedRoute>} />
           <Route path="/customers" element={<ProtectedRoute><Customers /></ProtectedRoute>} />
           <Route path="/petty-cash" element={<ProtectedRoute><PettyCash /></ProtectedRoute>} />
+          <Route path="/account-ledger" element={<ProtectedRoute><AccountLedger /></ProtectedRoute>} />
           <Route path="/users" element={<ProtectedRoute><Users /></ProtectedRoute>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
